@@ -1,0 +1,6 @@
+{
+  "name": "KASHFLOW - AI-Powered Financial Orchestration Platform",
+  "description": "Unified financial orchestration platform connecting global payments, double-entry ledger, multi-agent AI copilot (KASH AI), and personal & business financial centers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

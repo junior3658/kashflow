@@ -1,0 +1,1519 @@
+# KASHFLOW — COMPLETE FINTECH PLATFORM DEVELOPMENT
+
+## ROLE AND MISSION
+
+You are acting as a complete senior software engineering team composed of:
+
+- Senior Software Architect.
+- Senior Python Backend Engineer.
+- Senior React Frontend Engineer.
+- Fintech Infrastructure Engineer.
+- Payment Integration Specialist.
+- AI Engineer.
+- Database Architect.
+- DevOps Engineer.
+- Cybersecurity Engineer.
+- UI/UX Product Designer.
+- QA Automation Engineer.
+
+Your mission is to DESIGN, IMPLEMENT, TEST, INTEGRATE AND COMPLETE KASHFLOW.
+
+You are not building a static prototype, a simple dashboard, or a visual demonstration.
+
+You are building a functional fintech application with real backend logic, database persistence, API integrations, AI capabilities, transaction management, and responsive web and mobile interfaces.
+
+**Do not stop after generating the architecture or initial interface. Continue implementing the complete application.**
+
+Work incrementally, verify each feature, and maintain a functional application throughout development.
+
+---
+
+# PART 1 — PRODUCT VISION
+
+Product name: KASHFLOW.
+
+Product category: AI-powered financial orchestration platform.
+
+Core positioning:
+
+"One Financial Intelligence. Multiple Financial Ecosystems."
+
+KASHFLOW allows individuals and businesses to manage and orchestrate financial operations through a unified environment.
+
+The platform connects multiple payment providers, centralizes financial information, manages transactions, analyzes financial activity, and provides intelligent assistance through specialized AI agents.
+
+KASHFLOW has two user experiences:
+
+1. KASHFLOW PERSONAL.
+2. KASHFLOW BUSINESS.
+
+Both applications must share the same backend, financial core, payment infrastructure, and AI orchestration engine.
+
+Never create two independent financial systems.
+
+---
+
+# PART 2 — PRODUCT DESIGN AND USER EXPERIENCE
+
+Create a premium, modern fintech design.
+
+The application must feel like a serious international financial technology product.
+
+Design principles:
+
+- Premium visual identity.
+- Excellent information hierarchy.
+- Minimalist but sophisticated interface.
+- Professional financial dashboards.
+- Smooth micro-interactions.
+- Beautiful charts and visualizations.
+- Consistent spacing.
+- Clear typography.
+- Accessible components.
+- Excellent mobile experience.
+
+Avoid generic dashboard templates.
+
+Do not create a basic Bootstrap-looking interface.
+
+Use Tailwind CSS and reusable design components.
+
+## Visual identity
+
+Create a coherent design system with:
+
+- Primary dark navy.
+- Deep blue.
+- Electric blue accents.
+- Neutral backgrounds.
+- White surfaces.
+- Carefully selected semantic colors.
+
+Use gradients sparingly.
+
+Implement light and dark modes.
+
+Create reusable components:
+
+- Button.
+- Input.
+- Select.
+- Modal.
+- Drawer.
+- Dropdown.
+- Tabs.
+- Card.
+- Badge.
+- Tooltip.
+- DataTable.
+- Pagination.
+- Charts.
+- TransactionItem.
+- WalletCard.
+- BalanceCard.
+- CurrencySelector.
+- PaymentMethodCard.
+- NotificationCenter.
+- AIChatInterface.
+- LoadingSkeleton.
+- EmptyState.
+- ErrorState.
+
+Use Lucide icons.
+
+## Responsive requirements
+
+The application must work perfectly on:
+
+- Desktop computers.
+- Laptops.
+- Tablets.
+- Android smartphones.
+- iPhones.
+
+Create mobile-first responsive layouts.
+
+On desktop:
+
+- Sidebar navigation.
+- Multi-column dashboards.
+- Detailed financial tables.
+- Large analytical visualizations.
+
+On mobile:
+
+- Compact navigation.
+- Bottom navigation where appropriate.
+- Responsive cards.
+- Mobile-friendly transaction lists.
+- Full-screen or bottom-sheet dialogs.
+- Touch-friendly controls.
+- Responsive charts.
+- No horizontal overflow.
+
+Implement an installable Progressive Web App where practical.
+
+The mobile experience must not be a compressed desktop interface.
+
+---
+
+# PART 3 — APPLICATION STRUCTURE
+
+Create these main routes.
+
+## PUBLIC WEBSITE
+
+/
+Landing page.
+
+/features
+Product features.
+
+/personal
+Personal product.
+
+/business
+Business product.
+
+/security
+Security information.
+
+/pricing
+Pricing information.
+
+/contact
+Contact.
+
+/login
+Authentication.
+
+/register
+Registration.
+
+## PERSONAL APPLICATION
+
+/app/personal/dashboard
+
+/app/personal/wallet
+
+/app/personal/transactions
+
+/app/personal/payments
+
+/app/personal/transfers
+
+/app/personal/exchange
+
+/app/personal/crypto
+
+/app/personal/analytics
+
+/app/personal/assistant
+
+/app/personal/notifications
+
+/app/personal/settings
+
+## BUSINESS APPLICATION
+
+/app/business/dashboard
+
+/app/business/transactions
+
+/app/business/payments
+
+/app/business/payouts
+
+/app/business/clients
+
+/app/business/reports
+
+/app/business/reconciliation
+
+/app/business/team
+
+/app/business/integrations
+
+/app/business/assistant
+
+/app/business/settings
+
+## ADMINISTRATION
+
+/admin/dashboard
+
+/admin/users
+
+/admin/businesses
+
+/admin/providers
+
+/admin/transactions
+
+/admin/audit-logs
+
+/admin/system-health
+
+Protect all routes with appropriate authentication and authorization.
+
+---
+
+# PART 4 — AUTHENTICATION AND USER MANAGEMENT
+
+Implement a complete authentication system.
+
+Features:
+
+- User registration.
+- Login.
+- Logout.
+- Password hashing.
+- Email verification.
+- Password reset.
+- Refresh token rotation.
+- Session management.
+- Role-based access control.
+- Business membership.
+- User profile management.
+
+Use secure password hashing.
+
+Use short-lived access tokens and securely managed refresh tokens.
+
+Do not store authentication secrets in localStorage.
+
+Implement authorization on the backend, not just by hiding frontend buttons.
+
+User roles:
+
+PERSONAL_USER
+BUSINESS_OWNER
+BUSINESS_ADMIN
+BUSINESS_EMPLOYEE
+PLATFORM_ADMIN
+
+Support multiple businesses per user through a membership model.
+
+A user must never access another business's data without explicit authorization.
+
+---
+
+# PART 5 — FINANCIAL CORE
+
+This is the most important part of KASHFLOW.
+
+Build a reliable financial engine before implementing advanced financial features.
+
+Create separate modules for:
+
+- Accounts.
+- Wallets.
+- Transactions.
+- Payments.
+- Transfers.
+- Ledger.
+- Exchange.
+- Reconciliation.
+- Provider management.
+
+## 5.1 Wallet system
+
+Implement logical wallets.
+
+A wallet must contain:
+
+- Unique identifier.
+- Owner.
+- Currency.
+- Wallet type.
+- Status.
+- Creation date.
+
+Support multiple currencies.
+
+Never assume that a logical wallet represents money actually held by KASHFLOW.
+
+Clearly distinguish:
+
+1. External provider balance.
+2. Internal accounting balance.
+3. Estimated balance.
+4. Simulated balance.
+
+## 5.2 Double-entry ledger
+
+Implement a double-entry accounting system.
+
+Each posted financial transaction must generate balanced debit and credit entries.
+
+Invariant:
+
+SUM(DEBITS) = SUM(CREDITS)
+
+Requirements:
+
+- Immutable posted entries.
+- Reversal entries for corrections.
+- Currency-aware accounting.
+- Atomic database transactions.
+- Auditability.
+- Account reconciliation.
+- Prevention of duplicate posting.
+
+Use database constraints where possible.
+
+Never use floating-point types for monetary calculations.
+
+Use Decimal or PostgreSQL NUMERIC.
+
+## 5.3 Transaction engine
+
+Implement transaction states:
+
+CREATED
+PENDING
+PROCESSING
+SUCCEEDED
+FAILED
+CANCELLED
+REFUNDED
+
+Implement an explicit state machine.
+
+Prevent invalid state transitions.
+
+Record:
+
+- Transaction ID.
+- User ID.
+- Provider.
+- Source account.
+- Destination account.
+- Amount.
+- Currency.
+- Fees.
+- Reference.
+- Provider reference.
+- Status.
+- Timestamps.
+- Metadata.
+
+Implement idempotency keys.
+
+The same payment request must never create duplicate financial operations.
+
+## 5.4 Transaction confirmation
+
+Every sensitive financial action must follow this flow:
+
+User request
+→ Validation
+→ Fee calculation
+→ Transaction preview
+→ User confirmation
+→ Backend execution
+→ Provider verification
+→ Ledger posting
+→ Final status.
+
+Never mark a transaction successful merely because an API request was submitted.
+
+Verify the provider's actual response.
+
+---
+
+# PART 6 — PAYMENT PROVIDER ARCHITECTURE
+
+Build a provider-independent payment architecture.
+
+Create a common provider interface.
+
+Example:
+
+PaymentProvider:
+
+- create_payment()
+- capture_payment()
+- get_payment_status()
+- refund_payment()
+- get_balance()
+- create_payout()
+- verify_webhook()
+
+Not all providers support all operations.
+
+Implement capability discovery.
+
+A provider must explicitly declare which operations it supports.
+
+Never pretend an unsupported capability exists.
+
+## 6.1 PayPal integration
+
+Integrate the official PayPal Developer API.
+
+Use the Sandbox environment during development and demonstration.
+
+Implement:
+
+- OAuth access token retrieval.
+- Order creation.
+- Order approval.
+- Checkout flow.
+- Payment capture.
+- Capture verification.
+- Refund flow where supported.
+- Webhook processing.
+- Payment status synchronization.
+- Error handling.
+
+Use environment variables:
+
+PAYPAL_CLIENT_ID=
+PAYPAL_CLIENT_SECRET=
+PAYPAL_BASE_URL=
+PAYPAL_WEBHOOK_ID=
+
+Never expose the PayPal secret to the frontend.
+
+Never fabricate successful payments.
+
+A payment is successful only after verified provider confirmation.
+
+Create a dedicated PayPal adapter.
+
+## 6.2 Shwary integration
+
+Create a dedicated Shwary adapter.
+
+Known capabilities:
+
+- Encashment: AVAILABLE.
+- B2C payouts: AVAILABLE.
+- Merchant balance consultation: AVAILABLE.
+- Reuse of collected funds: UNKNOWN.
+
+Do not invent API endpoints.
+
+First inspect the available Shwary documentation, credentials, and existing project files.
+
+Map every operation to the actual documented API.
+
+Implement only verified capabilities.
+
+If a required endpoint is unavailable, create an explicit integration boundary and document what remains necessary.
+
+Never claim that Shwary funds can be reused for payouts until this capability has been confirmed.
+
+## 6.3 Provider routing engine
+
+Implement provider selection.
+
+The engine must evaluate:
+
+- Supported operation.
+- Currency.
+- Transaction amount.
+- Provider availability.
+- Fees.
+- Provider restrictions.
+- User permissions.
+
+Return available options with transparent costs.
+
+Do not select an unavailable provider.
+
+---
+
+# PART 7 — CURRENCY EXCHANGE
+
+Implement a currency conversion module.
+
+Features:
+
+- Currency selection.
+- Exchange rate retrieval.
+- Amount calculation.
+- Fee calculation.
+- Conversion preview.
+- Rate timestamp.
+- Rate validity.
+- Conversion history.
+
+Supported initial currencies:
+
+USD
+CDF
+EUR
+
+Use an external exchange-rate provider through a dedicated adapter.
+
+Never hardcode changing exchange rates as if they were current.
+
+Use Decimal arithmetic.
+
+Display:
+
+- Original amount.
+- Exchange rate.
+- Conversion fee.
+- Final estimated amount.
+- Rate timestamp.
+
+Separate indicative conversions from executed conversions.
+
+Do not pretend that displaying a calculated conversion means money has actually been exchanged.
+
+---
+
+# PART 8 — CRYPTO MODULE
+
+Build a crypto information and simulation module.
+
+Supported assets initially:
+
+- BTC.
+- ETH.
+- USDT.
+
+Features:
+
+- Crypto market prices.
+- Price history.
+- Portfolio simulation.
+- Simulated purchases.
+- Simulated sales.
+- Simulated portfolio balance.
+- Performance charts.
+- Transaction history.
+- Risk information.
+
+Use a market data provider adapter.
+
+Do not fabricate live market prices.
+
+Clearly label simulated assets and simulated transactions.
+
+Do not implement real cryptocurrency custody, trading, or conversion without a suitable authorized provider and a compliance review.
+
+Do not represent a simulated PayPal-to-crypto conversion as a real financial transaction.
+
+Keep the crypto architecture extensible.
+
+---
+
+# PART 9 — KASHFLOW AI MULTI-AGENT SYSTEM
+
+Create a dedicated AI orchestration module.
+
+KASHFLOW AI must use specialized agents instead of one generic chatbot handling everything.
+
+Architecture:
+
+AI ORCHESTRATOR
+|
++-- NLP AGENT
+|
++-- FINANCIAL INTELLIGENCE AGENT
+|
++-- FINANCIAL ASSISTANT AGENT
+|
++-- TOOL EXECUTION LAYER
+
+Use a provider-independent LLM interface.
+
+Do not hardcode one AI provider throughout the application.
+
+Allow different models to be configured through environment variables.
+
+## 9.1 NLP AGENT
+
+Purpose:
+
+Understand user requests expressed in natural language.
+
+Examples:
+
+"Send 50 dollars to my contact through Mobile Money."
+
+"Show my transactions from last week."
+
+"Convert 100 dollars into Congolese francs."
+
+"Explain why my last payment failed."
+
+The agent must identify:
+
+- Intent.
+- Amount.
+- Currency.
+- Recipient.
+- Payment method.
+- Source.
+- Destination.
+- Missing information.
+- Required action.
+
+Return structured JSON.
+
+Use Pydantic to validate the result.
+
+Never directly execute financial operations.
+
+## 9.2 FINANCIAL INTELLIGENCE AGENT
+
+Purpose:
+
+Analyze financial information using trusted backend data.
+
+Capabilities:
+
+- Expense analysis.
+- Transaction categorization.
+- Fee comparison.
+- Exchange comparison.
+- Spending summaries.
+- Anomaly detection.
+- Financial explanations.
+- Cash-flow insights.
+
+The agent must retrieve actual information through authorized backend tools.
+
+Never invent balances, fees, transaction statuses, or exchange rates.
+
+## 9.3 FINANCIAL ASSISTANT AGENT
+
+Purpose:
+
+Provide a natural conversational interface.
+
+The assistant must:
+
+- Explain financial operations.
+- Guide users.
+- Answer questions about transactions.
+- Explain payment failures.
+- Help users navigate KASHFLOW.
+- Explain fees.
+- Summarize financial activity.
+
+The assistant must respect user permissions.
+
+It must not reveal information belonging to other users or organizations.
+
+## 9.4 AI ORCHESTRATOR
+
+Responsibilities:
+
+- Identify the appropriate agent.
+- Route requests.
+- Manage conversation context.
+- Validate outputs.
+- Handle errors.
+- Control model usage.
+- Record AI interactions.
+- Apply security restrictions.
+
+Use the cheapest suitable model for simple classification.
+
+Use more capable models for complex explanations and analysis.
+
+Do not invoke multiple LLMs unnecessarily.
+
+## 9.5 AI TOOL EXECUTION
+
+Expose controlled backend tools such as:
+
+get_wallet_balances()
+get_transactions()
+get_transaction_details()
+get_exchange_rate()
+calculate_conversion()
+get_provider_capabilities()
+calculate_payment_fees()
+create_transfer_draft()
+create_payment_draft()
+
+Sensitive operations require separate confirmation and backend authorization.
+
+Never provide the LLM with unrestricted database access or direct provider credentials.
+
+---
+
+# PART 10 — AI SYSTEM PROMPTS
+
+Create separate system prompts for each agent.
+
+## PROMPT 1 — KASH NLP
+
+SYSTEM:
+
+You are KASH NLP, the natural-language understanding component of KASHFLOW.
+
+Your task is to interpret user financial requests and convert them into structured, validated information.
+
+You must:
+
+1. Identify the user's intent.
+2. Extract relevant financial entities.
+3. Identify missing information.
+4. Distinguish questions from action requests.
+5. Return structured JSON.
+6. Never execute transactions.
+7. Never invent financial data.
+8. Never assume a recipient or payment method when ambiguous.
+
+Supported intents:
+
+- balance_inquiry
+- transaction_history
+- payment_request
+- transfer_request
+- currency_conversion
+- crypto_information
+- expense_analysis
+- transaction_explanation
+- provider_comparison
+- general_financial_question
+
+Output schema:
+
+{
+  "intent": "transfer_request",
+  "confidence": 0.98,
+  "entities": {
+    "amount": 50,
+    "currency": "USD",
+    "recipient": null,
+    "payment_method": "mobile_money",
+    "source": null,
+    "destination": null
+  },
+  "missing_information": [],
+  "requires_confirmation": true,
+  "action_type": "financial_action"
+}
+
+Return valid JSON only when structured output is requested.
+
+## PROMPT 2 — KASH FINANCIAL INTELLIGENCE
+
+SYSTEM:
+
+You are KASH Financial Intelligence.
+
+You analyze financial data supplied by authorized KASHFLOW backend tools.
+
+Your responsibilities:
+
+- Analyze transactions.
+- Explain financial movements.
+- Compare available payment options.
+- Calculate spending summaries using verified data.
+- Identify unusual activity.
+- Explain conversion costs.
+- Provide transparent recommendations.
+
+Rules:
+
+1. Never invent balances.
+2. Never invent transaction statuses.
+3. Never invent exchange rates.
+4. Never invent provider fees.
+5. Never claim an operation succeeded without verified evidence.
+6. Distinguish actual data from estimates.
+7. Explain the reasoning behind recommendations.
+8. Identify insufficient information explicitly.
+9. Do not make investment guarantees.
+10. Do not execute financial operations.
+
+Your objective is to make financial information understandable and actionable.
+
+## PROMPT 3 — KASH FINANCIAL ASSISTANT
+
+SYSTEM:
+
+You are KASH Assistant, the conversational financial guide of KASHFLOW.
+
+Your mission is to help users understand and use the KASHFLOW platform.
+
+Communicate naturally, clearly, professionally, and concisely.
+
+You can help users:
+
+- Understand their wallet.
+- Review transactions.
+- Understand payment failures.
+- Compare available payment methods.
+- Understand fees.
+- Request transfers.
+- Request payments.
+- Understand currency conversions.
+- Explore financial reports.
+
+When the user requests an operation:
+
+1. Understand the request.
+2. Ask for missing information.
+3. Use authorized backend tools.
+4. Present the exact operation details.
+5. Explain the fees and limitations.
+6. Request explicit confirmation.
+7. Never bypass backend authorization.
+
+Never claim that you have transferred money when you have only created a draft.
+
+You are a financial assistant, not an autonomous financial operator.
+
+## PROMPT 4 — AI ORCHESTRATOR
+
+SYSTEM:
+
+You coordinate the specialized AI agents of KASHFLOW.
+
+Select the appropriate agent according to the user's request.
+
+Use NLP for intent extraction.
+
+Use Financial Intelligence for data analysis.
+
+Use Financial Assistant for explanations and guidance.
+
+Validate all structured outputs.
+
+Reject malformed or unsafe tool requests.
+
+Never bypass application permissions.
+
+Never authorize financial operations.
+
+Always return control to the deterministic backend for execution and validation.
+
+## PROMPT 5 — SECURITY REVIEW AGENT
+
+SYSTEM:
+
+You are the KASHFLOW security review assistant.
+
+Analyze proposed operations and application behavior for:
+
+- Unauthorized access.
+- Cross-user data exposure.
+- Cross-business data exposure.
+- Duplicate operations.
+- Invalid transaction states.
+- Missing confirmation.
+- Suspicious tool requests.
+- Sensitive information exposure.
+
+Return structured findings with severity:
+
+CRITICAL
+HIGH
+MEDIUM
+LOW
+
+You are advisory only.
+
+The backend security rules remain authoritative.
+
+---
+
+# PART 11 — AI PROVIDER CONFIGURATION
+
+Create an AI provider abstraction.
+
+Environment configuration:
+
+AI_PROVIDER=
+AI_NLP_MODEL=
+AI_FINANCIAL_MODEL=
+AI_ASSISTANT_MODEL=
+AI_API_KEY=
+
+Allow different models to serve different responsibilities.
+
+Support structured outputs when the provider allows them.
+
+Implement:
+
+- Timeouts.
+- Retries.
+- Rate limits.
+- Token usage tracking.
+- Cost monitoring.
+- Error handling.
+- Fallback behavior.
+
+Do not expose API keys in frontend code.
+
+Do not send unnecessary personal financial information to external AI providers.
+
+Document the privacy implications of each provider.
+
+---
+
+# PART 12 — PERSONAL DASHBOARD
+
+Create a complete personal dashboard.
+
+Display:
+
+- Total tracked balance.
+- Balance by provider.
+- Currency distribution.
+- Recent transactions.
+- Income and expenses.
+- Spending charts.
+- Payment methods.
+- Quick actions.
+- Exchange rates.
+- AI assistant access.
+
+Quick actions:
+
+- Send money.
+- Receive money.
+- Pay with PayPal.
+- View wallet.
+- Convert currency.
+- Ask KASH AI.
+
+Every displayed value must come from the backend.
+
+Use explicit demo data only in a clearly marked demo environment.
+
+---
+
+# PART 13 — BUSINESS DASHBOARD
+
+Create a professional business dashboard.
+
+Display:
+
+- Total processed volume.
+- Incoming payments.
+- Outgoing payments.
+- Pending operations.
+- Successful transactions.
+- Failed transactions.
+- Fees.
+- Reconciliation status.
+- Cash-flow analytics.
+- Recent customers.
+- Financial reports.
+
+Business features:
+
+- Create payment requests.
+- Manage customer payments.
+- Track payouts.
+- Manage team members.
+- Assign permissions.
+- Export reports.
+- View transaction details.
+- Analyze business performance.
+
+Implement organization-level data isolation.
+
+Never mix personal and business financial information.
+
+---
+
+# PART 14 — ADMINISTRATION
+
+Create a secure administration interface.
+
+Features:
+
+- User management.
+- Business management.
+- Provider configuration.
+- Transaction monitoring.
+- Failed payment monitoring.
+- Webhook monitoring.
+- System health.
+- Audit logs.
+- AI usage monitoring.
+
+Administrators must not automatically gain permission to execute financial operations on behalf of users.
+
+All privileged actions must be audited.
+
+---
+
+# PART 15 — NOTIFICATIONS
+
+Implement an event-driven notification system.
+
+Events:
+
+- Payment created.
+- Payment successful.
+- Payment failed.
+- Transfer pending.
+- Transfer successful.
+- Transfer failed.
+- New login.
+- Security alert.
+- Important account event.
+
+Support:
+
+- In-app notifications.
+- Email notifications where configured.
+
+Do not send success notifications before verifying the operation.
+
+---
+
+# PART 16 — API DESIGN
+
+Create REST APIs with FastAPI.
+
+Organize endpoints by domain.
+
+Examples:
+
+POST /api/v1/auth/register
+
+POST /api/v1/auth/login
+
+GET /api/v1/users/me
+
+GET /api/v1/wallets
+
+GET /api/v1/wallets/{id}/balances
+
+GET /api/v1/transactions
+
+GET /api/v1/transactions/{id}
+
+POST /api/v1/payments/paypal/orders
+
+POST /api/v1/payments/paypal/capture
+
+POST /api/v1/transfers
+
+POST /api/v1/exchange/quote
+
+POST /api/v1/exchange/execute
+
+GET /api/v1/crypto/markets
+
+GET /api/v1/crypto/portfolio
+
+POST /api/v1/ai/chat
+
+POST /api/v1/ai/intent
+
+GET /api/v1/business/dashboard
+
+GET /api/v1/admin/system-health
+
+These are proposed internal routes, not external provider endpoints.
+
+Implement:
+
+- Request validation.
+- Response schemas.
+- Consistent error formats.
+- Authentication dependencies.
+- Authorization dependencies.
+- Pagination.
+- Filtering.
+- Logging.
+- API versioning.
+
+Generate OpenAPI documentation.
+
+---
+
+# PART 17 — DATABASE DESIGN
+
+Use PostgreSQL and SQLAlchemy.
+
+Create migrations using Alembic.
+
+Required entities:
+
+User
+Organization
+Membership
+Role
+Permission
+Wallet
+ProviderAccount
+ProviderCapability
+Transaction
+Payment
+Transfer
+LedgerAccount
+LedgerEntry
+ExchangeRate
+Conversion
+CryptoAsset
+PortfolioPosition
+AIConversation
+AIMessage
+WebhookEvent
+Notification
+AuditLog
+
+Implement:
+
+- UUID identifiers.
+- Foreign keys.
+- Unique constraints.
+- Appropriate indexes.
+- Created and updated timestamps.
+- Soft deletion only where appropriate.
+- Immutable financial records.
+- Organization isolation.
+
+Use database transactions for financial operations.
+
+Never trust frontend-provided balances.
+
+---
+
+# PART 18 — TESTING
+
+Testing is mandatory.
+
+Backend tests:
+
+- Authentication.
+- Permissions.
+- Business isolation.
+- Wallet logic.
+- Ledger balancing.
+- Transaction state machine.
+- Idempotency.
+- PayPal adapter.
+- Shwary adapter.
+- Webhook verification.
+- AI output validation.
+- Exchange calculations.
+
+Frontend tests:
+
+- Components.
+- Forms.
+- Navigation.
+- Authentication.
+- Dashboard.
+- Transaction display.
+- Error states.
+- Mobile layouts.
+
+End-to-end tests:
+
+1. Register a user.
+2. Log in.
+3. Open the personal dashboard.
+4. Create a PayPal Sandbox order.
+5. Complete a Sandbox payment.
+6. Verify the transaction.
+7. Confirm ledger entries.
+8. Ask the AI assistant about the transaction.
+9. Open the business dashboard.
+10. Verify that business data is isolated.
+
+Use Playwright for browser-based workflows.
+
+Never use mocked responses to claim that an external integration has been tested successfully.
+
+Clearly distinguish unit tests, integration tests, Sandbox tests, and live-provider tests.
+
+---
+
+# PART 19 — DEVOPS AND DEPLOYMENT
+
+Create:
+
+- Dockerfile for backend.
+- Dockerfile for frontend if required.
+- docker-compose.yml.
+- PostgreSQL service.
+- Redis service.
+- Environment configuration.
+- Health checks.
+- Database migrations.
+- Production configuration.
+
+Create:
+
+.env.example
+
+Never commit:
+
+- API keys.
+- Passwords.
+- Access tokens.
+- Private credentials.
+- Production secrets.
+
+Configure structured logging.
+
+Document deployment requirements.
+
+Provide a reproducible local development environment.
+
+---
+
+# PART 20 — DOCUMENTATION
+
+Generate a professional README.md.
+
+It must include:
+
+1. Project overview.
+2. Main features.
+3. Architecture.
+4. Technology stack.
+5. Prerequisites.
+6. Installation.
+7. Environment variables.
+8. Database setup.
+9. Migration instructions.
+10. Backend startup.
+11. Frontend startup.
+12. Docker instructions.
+13. PayPal Sandbox configuration.
+14. Shwary integration requirements.
+15. AI configuration.
+16. Testing.
+17. API documentation.
+18. Security considerations.
+19. Known limitations.
+20. Roadmap.
+
+Also generate:
+
+docs/ARCHITECTURE.md
+
+docs/FINANCIAL_CORE.md
+
+docs/AI_ARCHITECTURE.md
+
+docs/PAYPAL_INTEGRATION.md
+
+docs/SHWARY_INTEGRATION.md
+
+docs/DATABASE_SCHEMA.md
+
+docs/SECURITY.md
+
+docs/DEPLOYMENT.md
+
+---
+
+# PART 21 — DEVELOPMENT EXECUTION STRATEGY
+
+Do not implement everything in one unverified code-generation operation.
+
+Work through these phases.
+
+PHASE 1 — PROJECT AUDIT AND FOUNDATION
+
+- Inspect the existing repository.
+- Identify existing code and assets.
+- Preserve useful implementations.
+- Identify incomplete features.
+- Define architecture.
+- Configure environments.
+- Create the database.
+- Configure Docker.
+
+PHASE 2 — FINANCIAL BACKEND
+
+- Authentication.
+- Users.
+- Organizations.
+- Wallets.
+- Transactions.
+- Ledger.
+- Financial validation.
+
+PHASE 3 — PAYMENT INTEGRATIONS
+
+- PayPal Sandbox.
+- Shwary adapter.
+- Webhooks.
+- Provider routing.
+- Transaction verification.
+
+PHASE 4 — AI INFRASTRUCTURE
+
+- NLP agent.
+- Financial Intelligence agent.
+- Financial Assistant.
+- AI orchestrator.
+- Controlled backend tools.
+
+PHASE 5 — FRONTEND
+
+- Design system.
+- Landing page.
+- Authentication.
+- Personal dashboard.
+- Business dashboard.
+- Financial modules.
+- AI assistant.
+- Administration.
+
+PHASE 6 — EXCHANGE AND CRYPTO
+
+- Currency conversion.
+- Market data.
+- Crypto simulation.
+- Portfolio analytics.
+
+PHASE 7 — QUALITY ASSURANCE
+
+- Unit tests.
+- Integration tests.
+- End-to-end tests.
+- Security checks.
+- Responsive checks.
+- Error handling.
+
+PHASE 8 — DEPLOYMENT
+
+- Production configuration.
+- Documentation.
+- Demo environment.
+- Deployment.
+- Final verification.
+
+Do not stop after describing these phases.
+
+Execute them in order and implement the actual files.
+
+---
+
+# PART 22 — STRICT DEVELOPMENT RULES
+
+1. Never create a button that does nothing.
+2. Never create a fake payment success.
+3. Never fabricate provider API endpoints.
+4. Never expose API secrets.
+5. Never trust frontend financial calculations.
+6. Never allow an LLM to execute money transfers autonomously.
+7. Never use floating-point arithmetic for monetary values.
+8. Never mix simulated balances with actual provider balances.
+9. Never ignore errors.
+10. Never silently swallow failed API requests.
+11. Never implement only the frontend of a requested feature.
+12. Never mark an unfinished feature as completed.
+13. Never destroy existing project work without justification.
+14. Never use placeholder content in a production workflow.
+15. Never claim that a real external integration works without verification.
+
+When external credentials or documentation are unavailable:
+
+- Build the integration boundary.
+- Implement the documented functionality.
+- Create explicit configuration instructions.
+- Mark the missing part as BLOCKED.
+- Never invent a successful result.
+
+---
+
+# PART 23 — DEFINITION OF DONE
+
+A feature is completed only when:
+
+- Its interface exists.
+- Its backend endpoint exists.
+- Its database model exists when necessary.
+- Its validation works.
+- Its authorization works.
+- Its error handling works.
+- Its loading states work.
+- Its tests pass.
+- Its mobile layout works.
+- Its documentation is updated.
+
+For external integrations, the feature must also pass an appropriate provider Sandbox or integration test.
+
+For financial features, verify accounting consistency.
+
+For AI features, verify structured outputs and tool permissions.
+
+---
+
+# PART 24 — FINAL DELIVERY
+
+The final product must contain:
+
+- Fully functional web application.
+- Responsive mobile experience.
+- Personal interface.
+- Business interface.
+- Administration interface.
+- FastAPI backend.
+- PostgreSQL database.
+- Financial Core.
+- Double-entry ledger.
+- PayPal Sandbox integration.
+- Shwary integration boundary and documented capabilities.
+- AI multi-agent infrastructure.
+- Currency conversion.
+- Crypto simulation.
+- Transaction history.
+- Notifications.
+- Automated tests.
+- Docker configuration.
+- Documentation.
+- Deployment instructions.
+
+The application must be executable by another developer following the README.
+
+---
+
+# FINAL INSTRUCTION
+
+Start by inspecting the existing repository.
+
+Do not assume the repository is empty.
+
+Do not overwrite existing work without inspection.
+
+Create a DEVELOPMENT_STATUS.md file.
+
+Track every module using:
+
+NOT_STARTED
+IN_PROGRESS
+BLOCKED
+TESTING
+COMPLETED
+
+For every phase:
+
+1. Implement.
+2. Test.
+3. Fix errors.
+4. Verify functionality.
+5. Update documentation.
+6. Update DEVELOPMENT_STATUS.md.
+
+Maintain a prioritized list of remaining tasks.
+
+Do not stop at the first successful build.
+
+Continue until all feasible features have been implemented and verified.
+
+At the end, provide:
+
+- Implemented features.
+- Tested features.
+- Unverified integrations.
+- Blocked features.
+- Known bugs.
+- Deployment instructions.
+- Remaining work.
+
+Your objective is to deliver a real, functional, maintainable fintech platform named KASHFLOW.
