@@ -176,19 +176,23 @@ The repository also defines `npm start` for starting the Express server in produ
 
 ## Environment configuration
 
-The tracked `.env.example` currently documents the Gemini and application URL placeholders. The provider adapters also reference these optional configuration names:
+The tracked `.env.example` documents the required server-side configuration names:
 
 | Variable | Purpose |
 |---|---|
 | `GEMINI_API_KEY` | Gemini API access for AI features |
 | `APP_URL` | Public application URL where required by hosted flows |
+| `SHWARY_MERCHANT_ID` | Shwary merchant UUID (server-side only) |
+| `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
+| `SHWARY_BASE_URL` | Shwary API base URL; defaults to `https://api.shwary.com` |
+| `SHWARY_MODE` | `sandbox` by default; use `production` only after provider approval |
+| `SHWARY_CALLBACK_URL` | Public HTTPS callback URL, required in both modes |
 | `PAYPAL_CLIENT_ID` | PayPal Sandbox client identifier (future live adapter wiring) |
 | `PAYPAL_CLIENT_SECRET` | PayPal Sandbox secret (future live adapter wiring) |
 | `PAYPAL_BASE_URL` | PayPal API base URL; Sandbox by default |
-| `SHWARY_MERCHANT_ID` | Shwary merchant identifier (future live adapter wiring) |
-| `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
+| `PAYPAL_WEBHOOK_ID` | PayPal webhook identifier for future verification |
 
-**Note:** adding credentials to `.env` does not activate a real provider integration in the current code. Never place secrets in frontend code, screenshots, commits or public documentation.
+Shwary collection uses the server-side merchant credentials when configured. PayPal remains a mock adapter until its OAuth and REST calls are implemented. Never place secrets in frontend code, screenshots, commits or public documentation.
 
 ## Tests
 
