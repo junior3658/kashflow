@@ -34,7 +34,7 @@ export class ShwaryAdapter {
   private readonly mode: ShwaryMode = process.env.SHWARY_MODE === 'production' ? 'production' : 'sandbox';
 
   isConfigured(): boolean {
-    return Boolean(this.merchantId && this.merchantKey && (this.mode === 'sandbox' || this.callbackUrl));
+    return Boolean(this.merchantId && this.merchantKey && this.callbackUrl);
   }
 
   getCapabilities() {
@@ -70,7 +70,7 @@ export class ShwaryAdapter {
 
   async requestEncashment(params: ShwaryEncashmentParams): Promise<ShwaryCollectionResult> {
     if (!this.isConfigured()) {
-      throw new Error('Shwary is not configured. Set SHWARY_MERCHANT_ID and SHWARY_MERCHANT_KEY on the server. Production mode also requires SHWARY_CALLBACK_URL.');
+      throw new Error('Shwary is not configured. Set SHWARY_MERCHANT_ID and SHWARY_MERCHANT_KEY on the server. Set SHWARY_CALLBACK_URL to a public HTTPS callback endpoint.');
     }
 
     if (params.currency !== 'CDF') {
@@ -91,7 +91,7 @@ export class ShwaryAdapter {
     const payload: Record<string, unknown> = {
       amount: params.amountCents / 100,
       clientPhoneNumber: phone,
-      callbackUrl: this.callbackUrl || 'https://example.invalid/shwary-callback-not-configured',
+      callbackUrl: this.callbackUrl!,
     };
 
     const response = await fetch(url, {
