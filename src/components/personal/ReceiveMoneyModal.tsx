@@ -272,7 +272,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
             {shwaryResult?.requestId && (
               <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 space-y-2">
                 <div className="font-bold text-amber-900 dark:text-amber-200">Request accepted — confirmation pending</div>
-                <div className="text-amber-800 dark:text-amber-300">Request ID: <span className="font-mono">{shwaryResult.requestId}</span></div>
+                <div className="text-amber-800 dark:text-amber-300">KASHFLOW reference: <span className="font-mono">{shwaryResult.requestId}</span></div>
                 <p className="text-amber-800 dark:text-amber-300">{shwaryResult.message}</p>
                 <p className="text-[11px] text-amber-800 dark:text-amber-300">KASHFLOW has not credited your wallet. Wait for verified provider confirmation.</p>
                 <button
