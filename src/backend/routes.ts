@@ -160,17 +160,30 @@ apiRouter.get('/payments/shwary/capabilities', (req: Request, res: Response) => 
 
 apiRouter.post('/payments/shwary/encashment', async (req: Request, res: Response) => {
   try {
-    const { amount, currency, phone, operator } = req.body;
+    const { amount, currency, phone } = req.body;
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ error: 'A positive amount is required.' });
+    }
+    if (currency !== 'CDF') {
+      return res.status(400).json({ error: 'The currently documented Shwary DRC collection flow supports CDF only.' });
+    }
+    if (typeof phone !== 'string' || !phone.trim()) {
+      return res.status(400).json({ error: 'A customer phone number is required.' });
+    }
+
     const result = await shwaryAdapter.requestEncashment({
-      amountCents: Math.round(Number(amount) * 100),
-      currency: currency || 'CDF',
-      customerPhone: phone || '+243810000000',
-      operator: operator || 'vodacom',
-      reference: `ENC-${Date.now()}`,
+      amountCents: Math.round(numericAmount * 100),
+      currency: 'CDF',
+      customerPhone: phone,
     });
-    res.json(result);
+
+    // An HTTP 2xx response only acknowledges the collection request.
+    // Do not credit the wallet or mark the transaction SUCCEEDED here.
+    res.status(202).json(result);
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.status(502).json({ error: err.message || 'Shwary collection request failed.' });
   }
 });
 
