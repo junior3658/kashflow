@@ -37,8 +37,8 @@ export class KashflowDatabase {
     // 1. Primary User: Junior
     const userJunior: User = {
       id: 'usr_junior_01',
-      email: 'ngwejjunior3@gmail.com',
-      fullName: 'Junior Ngwej',
+      email: 'demo@kashflow.local',
+      fullName: 'KASHFLOW Demo User',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
       role: 'BUSINESS_OWNER',
       currentOrgId: 'org_kashflow_corp',
@@ -69,7 +69,7 @@ export class KashflowDatabase {
     const org: Organization = {
       id: 'org_kashflow_corp',
       name: 'KASHFLOW Enterprise Solutions',
-      taxId: 'CD-LSH-2026-B-9982',
+      taxId: 'DEMO-TAX-ID',
       ownerUserId: userJunior.id,
       currency: 'USD',
       status: 'ACTIVE',
@@ -344,7 +344,7 @@ export class KashflowDatabase {
       id: 'msg_init',
       sender: 'assistant',
       content:
-        'Hello Junior! I am KASH AI, your financial copilot. I can prepare payments, compare exchange rates (USD/EUR/CDF), analyze your cash flow, or inspect transactions. How can I help you today?',
+        'Hello! I am KASH AI, your financial copilot. I can prepare payments, compare exchange rates (USD/EUR/CDF), analyze your cash flow, or inspect transactions. How can I help you today?',
       timestamp: new Date().toISOString(),
       metadata: {
         agentUsed: 'FINANCIAL_ASSISTANT',
