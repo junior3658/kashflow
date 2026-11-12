@@ -22,7 +22,6 @@ export interface ShwaryCollectionResult {
   requestId: string;
   status: 'PENDING_PROVIDER_CONFIRMATION';
   mode: ShwaryMode;
-  providerResponse: unknown;
   message: string;
 }
 
@@ -125,7 +124,6 @@ export class ShwaryAdapter {
       requestId: `shwary_req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       status: 'PENDING_PROVIDER_CONFIRMATION',
       mode: this.mode,
-      providerResponse,
       message: 'Collection request accepted by the API. Await verified provider confirmation before crediting a wallet or marking the transaction successful.',
     };
   }
