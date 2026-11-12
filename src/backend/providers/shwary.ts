@@ -8,8 +8,6 @@
  * Payout and merchant-balance endpoints are deliberately not guessed.
  */
 
-import { Currency } from '../types';
-
 export type ShwaryMode = 'sandbox' | 'production';
 
 export interface ShwaryEncashmentParams {
