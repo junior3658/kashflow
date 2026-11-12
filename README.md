@@ -47,7 +47,7 @@ The repository currently contains the following prototype modules:
 | Wallets | USD, EUR and CDF wallet models and balance views | Seeded demo data |
 | Transactions | Draft, confirmation, cancellation and transaction-state logic | Local simulation |
 | PayPal | Order/capture adapter contract and checkout-style flow | **Mock adapter; no live PayPal API calls yet** |
-| Shwary | Capability boundary, encashment and payout adapter interfaces | **Mock adapter; no live Shwary API calls yet** |
+| Shwary | DRC CDF collection endpoint wired to the supplied API sample | **Sandbox request integration; B2C payout and balance pending official endpoint specifications** |
 | Provider routing | Provider option and fee-routing logic | Prototype |
 | Currency exchange | Quote and conversion workflow | Local/demo rate implementation |
 | Digital assets | BTC, ETH and USDT portfolio and trade simulation | Simulation only; no blockchain transactions |
