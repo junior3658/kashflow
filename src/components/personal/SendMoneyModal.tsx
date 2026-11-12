@@ -20,7 +20,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
   const [recipient, setRecipient] = useState('Owen F.');
   const [recipientPhone, setRecipientPhone] = useState('+243 82 444 8888');
   const [currency, setCurrency] = useState<Currency>('USD');
-  const [selectedProvider, setSelectedProvider] = useState<'SHWARY' | 'PAYPAL' | 'INTERNAL'>('SHWARY');
+  const [selectedProvider, setSelectedProvider] = useState<'SHWARY' | 'PAYPAL' | 'INTERNAL'>('INTERNAL');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'input' | 'preview' | 'success'>('input');
   const [draftTx, setDraftTx] = useState<any>(null);
@@ -224,28 +224,28 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
               </div>
             )}
 
-            {/* Provider selection buttons */}
-            <div className="flex gap-2 text-xs">
+            {/* External rails stay disabled until their payout APIs are verified. */}
+            <div className="space-y-2 text-xs">
+              <div className="font-semibold text-neutral-700 dark:text-neutral-300">Transfer route</div>
               <button
-                onClick={() => setSelectedProvider('SHWARY')}
-                className={`flex-1 py-2 rounded-xl border text-center transition-colors cursor-pointer ${
-                  selectedProvider === 'SHWARY'
-                    ? 'bg-blue-50 text-blue-700 border-blue-500 font-bold dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-600'
-                    : 'bg-neutral-50 border-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400'
-                }`}
+                onClick={() => setSelectedProvider('INTERNAL')}
+                className={`w-full py-2 rounded-xl border text-center ${selectedProvider === 'INTERNAL' ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-950' : 'bg-neutral-50 border-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:border-neutral-800'}`}
               >
-                Shwary Mobile Money
+                Internal demo transfer
               </button>
-              <button
-                onClick={() => setSelectedProvider('PAYPAL')}
-                className={`flex-1 py-2 rounded-xl border text-center transition-colors cursor-pointer ${
-                  selectedProvider === 'PAYPAL'
-                    ? 'bg-blue-50 text-blue-700 border-blue-500 font-bold dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-600'
-                    : 'bg-neutral-50 border-neutral-200 text-neutral-600 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-400'
-                }`}
-              >
-                PayPal Rails
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button disabled title="B2C payout endpoint specification not supplied"
+                  className="py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-400 cursor-not-allowed">
+                  Shwary payout — pending
+                </button>
+                <button disabled title="Real PayPal integration is not configured"
+                  className="py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-400 cursor-not-allowed">
+                  PayPal — pending
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Shwary collection is available in Receive & Deposit. B2C payouts remain disabled until the official payout endpoint is documented.
+              </p>
             </div>
 
             <button
@@ -297,7 +297,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
             <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 text-[11px] text-neutral-700 dark:text-neutral-300 flex items-start gap-2">
               <ShieldCheck className="w-4 h-4 shrink-0 text-neutral-900 dark:text-white mt-0.5" />
               <span>
-                By confirming, you authorize KASHFLOW to commit balanced double-entry ledger postings and dispatch funds through the verified rail.
+                This is an internal demonstration transfer only. It updates local demo data and does not dispatch money through Shwary, PayPal, a bank or a mobile-money operator.
               </span>
             </div>
 
@@ -328,9 +328,9 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
             </div>
 
             <div>
-              <h3 className="text-lg font-extrabold text-neutral-900 dark:text-white">Transfer Settled Successfully</h3>
+              <h3 className="text-lg font-extrabold text-neutral-900 dark:text-white">Demo Transfer Recorded</h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Funds dispatched to {recipient}. Double-entry ledger postings committed.
+                This local demonstration did not move real funds. No external provider was called.
               </p>
             </div>
 
