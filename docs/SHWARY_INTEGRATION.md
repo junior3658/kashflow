@@ -52,7 +52,8 @@ SHWARY_CALLBACK_URL=
 
 - `SHWARY_MODE=sandbox` is the default.
 - Use `SHWARY_MODE=production` only after Shwary has enabled production access.
-- Both modes require a publicly reachable HTTPS `SHWARY_CALLBACK_URL`.
+- `SHWARY_CALLBACK_URL` is optional in Sandbox; set it to a publicly reachable HTTPS endpoint for callback testing.
+- Production mode requires a publicly reachable HTTPS `SHWARY_CALLBACK_URL`.
 - Never commit `.env`, merchant IDs/keys, PayPal secrets or any other credentials.
 
 ## 4. API request example
