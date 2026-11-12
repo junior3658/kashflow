@@ -19,7 +19,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
   const [orderCreated, setOrderCreated] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [successPayload, setSuccessPayload] = useState<any>(null);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false);\n  const [shwaryPhone, setShwaryPhone] = useState('');\n  const [shwaryAmount, setShwaryAmount] = useState('100');\n  const [shwaryResult, setShwaryResult] = useState<any>(null);
 
   if (!isOpen) return null;
 
@@ -66,6 +66,29 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
     }
   };
 
+  const handleShwaryCollection = async () => {
+    setIsProcessing(true);
+    setShwaryResult(null);
+    try {
+      const response = await fetch('/api/v1/payments/shwary/encashment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(shwaryAmount),
+          currency: 'CDF',
+          phone: shwaryPhone,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Shwary collection request failed.');
+      setShwaryResult(data);
+    } catch (error: any) {
+      setShwaryResult({ error: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard?.writeText(`https://pay.kashflow.io/u/junior?amount=${amount}&currency=${currency}`);
     setCopied(true);
@@ -79,7 +102,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-sm font-extrabold tracking-tight">Receive & Deposit Funds</span>
             <span className="text-[10px] font-mono font-bold text-neutral-800 bg-neutral-100 dark:text-neutral-200 dark:bg-neutral-800 px-2 py-0.5 rounded border border-neutral-200 dark:border-neutral-700">
-              Live Rails
+              Provider integrations
             </span>
           </div>
 
@@ -201,48 +224,68 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
           </div>
         )}
 
-        {/* SHWARY USSD TAB */}
+        {/* SHWARY COLLECTION TAB */}
         {activeTab === 'shwary' && (
           <div className="space-y-3 text-xs">
             <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300">
-              <span className="font-bold text-neutral-900 dark:text-white block mb-1">Mobile Money Collection (USSD Push)</span>
-              A prompt will be pushed to the customer phone for PIN authorization on M-Pesa, Airtel Money, or Orange Money.
+              <span className="font-bold text-neutral-900 dark:text-white block mb-1">Shwary Mobile Money Collection</span>
+              Initiate a documented DRC collection request. The customer must approve the prompt on their phone.
+              A request accepted by the API is not yet a confirmed payment.
             </div>
 
-            <div>
-              <label className="text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">Customer Phone Number</label>
-              <input
-                type="text"
-                placeholder="+243 81 000 0000"
-                defaultValue="+243 81 234 5678"
-                className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono"
-              />
-            </div>
+            {!shwaryResult?.requestId && (
+              <>
+                <div>
+                  <label className="text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">Customer phone number</label>
+                  <input
+                    type="tel"
+                    value={shwaryPhone}
+                    onChange={(event) => setShwaryPhone(event.target.value)}
+                    placeholder="+243XXXXXXXXX"
+                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">Amount (whole CDF)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={shwaryAmount}
+                    onChange={(event) => setShwaryAmount(event.target.value)}
+                    className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono"
+                  />
+                </div>
+                <button
+                  onClick={handleShwaryCollection}
+                  disabled={isProcessing || !shwaryPhone.trim() || Number(shwaryAmount) <= 0 || !Number.isInteger(Number(shwaryAmount))}
+                  className="w-full py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-white font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessing ? 'Sending request to Shwary...' : 'Initiate Mobile Money Collection'}
+                </button>
+              </>
+            )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">Amount</label>
-                <input
-                  type="number"
-                  defaultValue="250000"
-                  className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono"
-                />
+            {shwaryResult?.requestId && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 space-y-2">
+                <div className="font-bold text-amber-900 dark:text-amber-200">Request accepted — confirmation pending</div>
+                <div className="text-amber-800 dark:text-amber-300">Request ID: <span className="font-mono">{shwaryResult.requestId}</span></div>
+                <p className="text-amber-800 dark:text-amber-300">{shwaryResult.message}</p>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300">KASHFLOW has not credited your wallet. Wait for verified provider confirmation.</p>
+                <button
+                  onClick={() => setShwaryResult(null)}
+                  className="w-full py-2 rounded-lg border border-amber-400 dark:border-amber-700 font-semibold"
+                >
+                  Start another request
+                </button>
               </div>
-              <div>
-                <label className="text-neutral-600 dark:text-neutral-400 block mb-1 font-medium">Currency</label>
-                <select className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono">
-                  <option value="CDF">CDF (Franc Congolais)</option>
-                  <option value="USD">USD</option>
-                </select>
-              </div>
-            </div>
+            )}
 
-            <button
-              onClick={() => alert('Shwary USSD prompt simulated: Push sent to phone for customer PIN confirmation.')}
-              className="w-full py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-100 text-white font-bold text-xs transition-colors cursor-pointer"
-            >
-              Dispatch USSD Prompt
-            </button>
+            {shwaryResult?.error && (
+              <div className="rounded-xl border border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800 p-3 text-red-700 dark:text-red-300">
+                {shwaryResult.error}
+              </div>
+            )}
           </div>
         )}
 
