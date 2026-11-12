@@ -105,13 +105,8 @@ export class ShwaryAdapter {
       signal: AbortSignal.timeout(15000),
     });
 
-    const responseText = await response.text();
-    let providerResponse: unknown;
-    try {
-      providerResponse = responseText ? JSON.parse(responseText) : null;
-    } catch {
-      providerResponse = { raw: responseText.slice(0, 2000) };
-    }
+    // Consume the body without returning untrusted provider payloads to the client.
+    await response.text();
 
     if (!response.ok) {
       // Never include request headers or credentials in provider error messages.
