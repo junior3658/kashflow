@@ -52,7 +52,7 @@ SHWARY_CALLBACK_URL=
 
 - `SHWARY_MODE=sandbox` is the default.
 - Use `SHWARY_MODE=production` only after Shwary has enabled production access.
-- Production mode requires a public HTTPS `SHWARY_CALLBACK_URL`.
+- Both modes require a publicly reachable HTTPS `SHWARY_CALLBACK_URL`.
 - Never commit `.env`, merchant IDs/keys, PayPal secrets or any other credentials.
 
 ## 4. API request example
@@ -89,7 +89,7 @@ Collected funds must remain separate from payout liquidity until Shwary confirms
 
 ## 6. Callback and settlement safety
 
-The supplied sample contains a callback URL field, but it does not describe callback authentication, signature headers, event schema, retry behavior or event identifiers.
+KASHFLOW exposes `POST /api/v1/payments/shwary/callback` as a receiving placeholder. The supplied sample contains a callback URL field, but it does not describe callback authentication, signature headers, event schema, retry behavior or event identifiers.
 
 Therefore:
 - Do not treat an incoming callback as trusted solely because it reaches the endpoint.
