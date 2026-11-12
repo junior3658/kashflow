@@ -158,6 +158,17 @@ apiRouter.get('/payments/shwary/capabilities', (req: Request, res: Response) => 
   res.json(shwaryAdapter.getCapabilities());
 });
 
+// Shwary callback endpoint. The supplied sample does not document callback
+// signatures or event schema, so this endpoint deliberately does not settle funds.
+apiRouter.post('/payments/shwary/callback', (req: Request, res: Response) => {
+  res.status(202).json({
+    received: true,
+    verified: false,
+    settlementApplied: false,
+    message: 'Callback received for manual/provider-side verification. No wallet or ledger balance was changed.',
+  });
+});
+
 apiRouter.post('/payments/shwary/encashment', async (req: Request, res: Response) => {
   try {
     const { amount, currency, phone } = req.body;
@@ -336,7 +347,7 @@ apiRouter.get('/admin/health', (req: Request, res: Response) => {
     },
     providers: {
       paypal: { status: 'ONLINE', mode: 'SANDBOX' },
-      shwary: { status: 'ONLINE', boundary: 'QUARANTINE_ACTIVE' },
+      shwary: { status: shwaryAdapter.isConfigured() ? 'CONFIGURED' : 'NOT_CONFIGURED', mode: shwaryAdapter.getCapabilities().encashment.mode, boundary: 'SETTLEMENT_VERIFICATION_REQUIRED' },
       exchangeDesk: { status: 'ONLINE' },
       cryptoSimulation: { status: 'ONLINE', mode: 'SIMULATED' },
     },
