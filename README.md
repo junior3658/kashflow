@@ -72,7 +72,7 @@ Transparency matters in financial software. The following limitations are intent
 
 1. **No real-money processing:** the current PayPal and Shwary adapter implementations generate local/demo responses. They do not establish a live connection to either provider.
 2. **PayPal:** the repository contains a sandbox-oriented adapter contract and checkout-style approval URL, but the current adapter does not perform OAuth token acquisition, HTTP order creation, capture requests or genuine cryptographic webhook verification. A successful local response is not proof of a PayPal payment.
-3. **Shwary:** encashment, payout and balance methods currently return simulated values. Actual API integration requires the official merchant documentation, approved credentials and provider-side verification.
+3. **Shwary:** the documented DRC collection endpoint now makes a server-side API request in Sandbox by default. Payout and merchant-balance operations are not enabled because the supplied sample does not document their endpoints or response contracts. A collection request accepted by HTTP is not proof of a completed payment; settlement requires verified provider confirmation.
 4. **Shwary settlement boundary:** the project does not assume that collected C2B funds can be reused directly for B2C payouts. That capability remains unconfirmed and is treated as a settlement/compliance boundary.
 5. **Persistence:** application data is held in an in-memory database seeded at startup. Data is reset when the server process restarts. A durable production database and migrations are not yet integrated.
 6. **Authentication:** the current API uses a seeded demo session identity. The role-switch route is for prototype demonstration, not production authentication or authorization.
@@ -186,7 +186,7 @@ The tracked `.env.example` currently documents the Gemini and application URL pl
 | `PAYPAL_CLIENT_SECRET` | PayPal Sandbox secret (future live adapter wiring) |
 | `PAYPAL_BASE_URL` | PayPal API base URL; Sandbox by default |
 | `SHWARY_MERCHANT_ID` | Shwary merchant identifier (future live adapter wiring) |
-| `SHWARY_API_KEY` | Shwary API credential (future live adapter wiring) |
+| `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
 
 **Note:** adding credentials to `.env` does not activate a real provider integration in the current code. Never place secrets in frontend code, screenshots, commits or public documentation.
 
