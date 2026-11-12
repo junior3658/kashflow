@@ -151,8 +151,8 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
             {!successPayload ? (
               <>
                 <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-700 dark:text-neutral-300">
-                  <div className="font-bold text-neutral-900 dark:text-white mb-0.5">Official PayPal Developer Sandbox</div>
-                  Simulates full order creation, buyer approval, and cryptographic capture verification.
+                  <div className="font-bold text-neutral-900 dark:text-white mb-0.5">PayPal integration preview</div>
+                  The current PayPal adapter is a local mock. Real Sandbox OAuth, Orders, Capture and webhook verification are not connected yet.
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
@@ -184,7 +184,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
                     disabled={isProcessing}
                     className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    <span>{isProcessing ? 'Generating Sandbox Order...' : 'Create PayPal Sandbox Order'}</span>
+                    <span>{isProcessing ? 'Generating Sandbox Order...' : 'Create demo PayPal order'}</span>
                   </button>
                 ) : (
                   <div className="space-y-3 pt-2">
@@ -199,7 +199,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
                       className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>{isProcessing ? 'Capturing & Posting Ledger...' : 'Capture & Settle Sandbox Order'}</span>
+                      <span>{isProcessing ? 'Processing demo capture...' : 'Run demo capture'}</span>
                     </button>
                   </div>
                 )}
@@ -209,12 +209,12 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
                 <div className="w-12 h-12 mx-auto rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 flex items-center justify-center text-neutral-900 dark:text-white">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-extrabold">PayPal Payment Settled</h4>
+                <h4 className="text-base font-extrabold">Demo PayPal Flow Completed</h4>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   Capture ID: <span className="font-mono text-neutral-900 dark:text-white font-bold">{successPayload.capture?.captureId}</span>
                 </p>
                 <div className="text-xs text-neutral-700 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-900 p-2.5 rounded-xl font-mono">
-                  Ledger credited: +${(successPayload.capture?.amount / 100).toFixed(2)} USD
+                  Demo ledger amount: +${(successPayload.capture?.amount / 100).toFixed(2)} USD
                 </div>
                 <button
                   onClick={onClose}
