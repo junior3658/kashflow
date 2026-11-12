@@ -33,7 +33,14 @@ export class ShwaryAdapter {
   private readonly mode: ShwaryMode = process.env.SHWARY_MODE === 'production' ? 'production' : 'sandbox';
 
   isConfigured(): boolean {
-    return Boolean(this.merchantId && this.merchantKey && this.callbackUrl);
+    if (!this.merchantId || !this.merchantKey || !this.callbackUrl) return false;
+    try {
+      const apiUrl = new URL(this.baseUrl);
+      const callback = new URL(this.callbackUrl);
+      return apiUrl.protocol === 'https:' && callback.protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 
   getCapabilities() {
