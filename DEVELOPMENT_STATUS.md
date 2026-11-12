@@ -13,18 +13,18 @@
 | **Foundation & Runtime** | P0 | COMPLETED | Full-stack server with Vite middleware, Port 3000, TypeScript strict |
 | **Authentication & RBAC** | P0 | PROTOTYPE / INCOMPLETE | Seeded demo identity and role switch; production authentication and authorization still required |
 | **Financial Core & Ledger** | P0 | COMPLETED | Double-entry ledger: $\sum \text{Debits} = \sum \text{Credits}$, immutable entries, decimal precision |
-| **Wallets & Balances** | P0 | COMPLETED | Multi-currency (USD, EUR, CDF), Provider balance vs Internal Ledger vs Estimated vs Crypto |
-| **Transaction State Machine** | P0 | COMPLETED | CREATED → PENDING → PROCESSING → SUCCEEDED/FAILED/CANCELLED/REFUNDED + Idempotency |
+| **Wallets & Balances** | P0 | DEMO DATA | Multi-currency wallet views use seeded in-memory values; external balances are not verified against live providers |
+| **Transaction State Machine** | P0 | PROTOTYPE | Transaction lifecycle and local idempotency logic exist; provider settlement and durable concurrency guarantees are incomplete |
 | **PayPal Sandbox Provider** | P0 | MOCK / INCOMPLETE | Local mock adapter; OAuth, real Sandbox Orders/Capture calls and cryptographic webhook verification are not implemented |
 | **Shwary Provider** | P1 | PARTIAL | DRC CDF collection endpoint wired to supplied sample (Sandbox default); payout and balance endpoints blocked pending official specs; callback is not yet verified |
-| **Provider Routing Engine** | P0 | COMPLETED | Currency, amount, fee, and capability routing with cost transparency |
+| **Provider Routing Engine** | P0 | PROTOTYPE | Local routing and fee estimates; live provider pricing and settlement are not verified |
 | **Currency Exchange Module** | P1 | PROTOTYPE | Demo/local rates and quote workflow; not a verified live FX provider |
 | **Crypto Simulation Engine** | P2 | COMPLETED | BTC, ETH, USDT simulated portfolio, buy/sell simulation, risk notice |
-| **AI Multi-Agent Infrastructure**| P0 | COMPLETED | Provider-independent abstraction, 4 specialized agents + Security validator |
-| **KASH AI Conversational UI** | P0 | COMPLETED | Streaming responses, transaction previews, action confirmation, rich cards |
+| **AI Multi-Agent Infrastructure**| P0 | IMPLEMENTED / DEMO | Specialized agent modules exist; model behavior depends on valid server-side API configuration and requires evaluation |
+| **KASH AI Conversational UI** | P0 | PROTOTYPE | Conversational interface and draft-oriented flows are present; production authorization must be added before real financial actions |
 | **Personal Experience** | P0 | COMPLETED | Dashboard, quick send/receive, cards, spending graph, wallets, transactions |
-| **Business Experience** | P0 | COMPLETED | Business dashboard, reconciliation, payouts, team management, org isolation |
-| **Admin Experience** | P1 | COMPLETED | Provider health, audit logs, system monitor, user management |
+| **Business Experience** | P0 | PROTOTYPE | Business dashboard and demo workflows; production multi-tenant authorization and live payout integration remain incomplete |
+| **Admin Experience** | P1 | PROTOTYPE | Admin views use local/demo state and are not a production operations console |
 | **Financial & Security Audit** | P0 | TEST SUITE PRESENT | Regression scenarios exist; execution results must be confirmed in the target environment; not a security certification |
 | **Acceptance & QA Report** | P0 | COMPLETED | Comprehensive acceptance verification across Personal, Business, Admin |
 
