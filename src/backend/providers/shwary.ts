@@ -1,127 +1,143 @@
 /**
- * Shwary Mobile Money Adapter
- * Central Africa Mobile Money Gateway (USD & CDF corridors).
- * Implements Encashment, Payouts, and Balance inquiries with explicit architectural boundary.
+ * Shwary Mobile Money adapter.
+ *
+ * The only live endpoint implemented here is the DRC collection endpoint
+ * explicitly present in the integration sample supplied for this project:
+ * POST /api/v1/merchants/payment[/sandbox]/DRC
+ *
+ * Payout and merchant-balance endpoints are deliberately not guessed.
  */
 
 import { Currency } from '../types';
 
+export type ShwaryMode = 'sandbox' | 'production';
+
 export interface ShwaryEncashmentParams {
   amountCents: number;
-  currency: 'USD' | 'CDF';
+  currency: 'CDF';
   customerPhone: string;
-  operator: 'vodacom' | 'airtel' | 'orange';
-  reference: string;
+  operator?: 'vodacom' | 'airtel' | 'orange';
+  reference?: string;
 }
 
-export interface ShwaryPayoutParams {
-  amountCents: number;
-  currency: 'USD' | 'CDF';
-  recipientPhone: string;
-  operator: 'vodacom' | 'airtel' | 'orange';
-  reference: string;
+export interface ShwaryCollectionResult {
+  requestId: string;
+  status: 'PENDING_PROVIDER_CONFIRMATION';
+  mode: ShwaryMode;
+  providerResponse: unknown;
+  message: string;
 }
 
 export class ShwaryAdapter {
-  private merchantId: string;
-  private apiKey: string;
-  private baseUrl: string;
+  private readonly merchantId = process.env.SHWARY_MERCHANT_ID;
+  private readonly merchantKey = process.env.SHWARY_MERCHANT_KEY;
+  private readonly baseUrl = (process.env.SHWARY_BASE_URL || 'https://api.shwary.com').replace(/\/+$/, '');
+  private readonly callbackUrl = process.env.SHWARY_CALLBACK_URL;
+  private readonly mode: ShwaryMode = process.env.SHWARY_MODE === 'production' ? 'production' : 'sandbox';
 
-  constructor() {
-    this.merchantId = process.env.SHWARY_MERCHANT_ID || 'shw_demo_merchant';
-    this.apiKey = process.env.SHWARY_API_KEY || 'shw_demo_key';
-    this.baseUrl = process.env.SHWARY_BASE_URL || 'https://api.shwary.net/v1';
+  isConfigured(): boolean {
+    return Boolean(this.merchantId && this.merchantKey && (this.mode === 'sandbox' || this.callbackUrl));
   }
 
-  /**
-   * Capability Discovery
-   */
-  getCapabilities(): {
-    encashment: { supported: boolean; operators: string[]; currencies: Currency[] };
-    b2cPayouts: { supported: boolean; operators: string[]; currencies: Currency[] };
-    merchantBalance: { supported: boolean };
-    reusedCollectedFunds: { supported: boolean; status: string; note: string };
-  } {
+  getCapabilities() {
+    const configured = this.isConfigured();
     return {
       encashment: {
         supported: true,
-        operators: ['vodacom', 'airtel', 'orange'],
-        currencies: ['USD', 'CDF'],
+        integrationReady: configured,
+        mode: this.mode,
+        country: 'DRC',
+        currency: 'CDF',
+        endpointDocumented: true,
       },
       b2cPayouts: {
         supported: true,
-        operators: ['vodacom', 'airtel', 'orange'],
-        currencies: ['USD', 'CDF'],
+        integrationReady: false,
+        status: 'BLOCKED_MISSING_ENDPOINT_SPEC',
+        note: 'Merchant capability was reported, but the supplied integration sample does not document the payout endpoint or payload.',
       },
       merchantBalance: {
         supported: true,
+        integrationReady: false,
+        status: 'BLOCKED_MISSING_ENDPOINT_SPEC',
+        note: 'Merchant balance capability was reported, but the supplied integration sample does not document its endpoint or response schema.',
       },
       reusedCollectedFunds: {
         supported: false,
         status: 'UNCONFIRMED_BOUNDARY',
-        note: 'Funds collected via encashment remain in transit quarantine pending banking clearance.',
+        note: 'Do not use collected funds to finance payouts until Shwary confirms settlement and reuse permissions in writing.',
       },
     };
   }
 
-  /**
-   * Request mobile money collection prompt (USSD Push)
-   */
-  async requestEncashment(params: ShwaryEncashmentParams): Promise<{
-    transactionRef: string;
-    status: 'PENDING_CUSTOMER_APPROVAL' | 'FAILED';
-    operator: string;
-    amount: number;
-    currency: Currency;
-  }> {
-    if (!params.customerPhone.startsWith('+243') && !params.customerPhone.startsWith('0')) {
-      throw new Error('Invalid Congolese phone number format. Must start with +243 or 08/09.');
+  async requestEncashment(params: ShwaryEncashmentParams): Promise<ShwaryCollectionResult> {
+    if (!this.isConfigured()) {
+      throw new Error('Shwary is not configured. Set SHWARY_MERCHANT_ID and SHWARY_MERCHANT_KEY on the server. Production mode also requires SHWARY_CALLBACK_URL.');
     }
 
-    const ref = `SHW-ENC-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    if (params.currency !== 'CDF') {
+      throw new Error('The supplied Shwary integration sample documents the DRC collection flow in CDF only.');
+    }
 
+    if (!Number.isSafeInteger(params.amountCents) || params.amountCents <= 0 || params.amountCents % 100 !== 0) {
+      throw new Error('Shwary sample expects a positive whole-number amount. Decimal CDF amounts are not supported by this adapter.');
+    }
+
+    const phone = params.customerPhone.replace(/[\s()-]/g, '');
+    if (!/^\+243[0-9]{9}$/.test(phone)) {
+      throw new Error('Invalid DRC phone number. Use international format +243 followed by 9 digits.');
+    }
+
+    const sandboxPath = this.mode === 'sandbox' ? '/sandbox' : '';
+    const url = `${this.baseUrl}/api/v1/merchants/payment${sandboxPath}/DRC`;
+    const payload: Record<string, unknown> = {
+      amount: params.amountCents / 100,
+      clientPhoneNumber: phone,
+      callbackUrl: this.callbackUrl || 'https://example.invalid/shwary-callback-not-configured',
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-merchant-id': this.merchantId!,
+        'x-merchant-key': this.merchantKey!,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const responseText = await response.text();
+    let providerResponse: unknown;
+    try {
+      providerResponse = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      providerResponse = { raw: responseText.slice(0, 2000) };
+    }
+
+    if (!response.ok) {
+      // Never include request headers or credentials in provider error messages.
+      throw new Error(`Shwary collection request failed (HTTP ${response.status}). Check merchant configuration and provider response in secure server logs.`);
+    }
+
+    // The supplied sample does not define a verifiable response schema or callback
+    // signature contract. Therefore HTTP 2xx means "request accepted", not "paid".
     return {
-      transactionRef: ref,
-      status: 'PENDING_CUSTOMER_APPROVAL',
-      operator: params.operator,
-      amount: params.amountCents,
-      currency: params.currency,
+      requestId: `shwary_req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      status: 'PENDING_PROVIDER_CONFIRMATION',
+      mode: this.mode,
+      providerResponse,
+      message: 'Collection request accepted by the API. Await verified provider confirmation before crediting a wallet or marking the transaction successful.',
     };
   }
 
-  /**
-   * Trigger B2C Payout to beneficiary phone
-   */
-  async executePayout(params: ShwaryPayoutParams): Promise<{
-    payoutRef: string;
-    status: 'SUCCEEDED' | 'PENDING' | 'FAILED';
-    feeCents: number;
-  }> {
-    const feeCents = Math.round(params.amountCents * 0.015); // 1.5% fee
-    const payoutRef = `SHW-PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    return {
-      payoutRef,
-      status: 'SUCCEEDED',
-      feeCents,
-    };
+  async executePayout(): Promise<never> {
+    throw new Error('Shwary B2C payout is not enabled: the supplied documentation does not specify its endpoint, payload or response contract.');
   }
 
-  /**
-   * Consult merchant float balance
-   */
-  async getMerchantBalance(): Promise<{
-    usdAvailable: number;
-    cdfAvailable: number;
-    usdInTransit: number;
-    cdfInTransit: number;
-  }> {
-    return {
-      usdAvailable: 3450000, // $34,500.00
-      cdfAvailable: 7800000000, // 78,000,000 CDF
-      usdInTransit: 120000,
-      cdfInTransit: 45000000,
-    };
+  async getMerchantBalance(): Promise<never> {
+    throw new Error('Shwary merchant balance retrieval is not enabled: the supplied documentation does not specify its endpoint or response contract.');
   }
 }
 
