@@ -47,7 +47,7 @@ export class KashflowDatabase {
 
     const userPatrick: User = {
       id: 'usr_patrick_02',
-      email: 'patrick@partner.com',
+      email: 'partner@example.test',
       fullName: 'Patrick M.',
       role: 'PERSONAL_USER',
       createdAt: '2026-02-10T10:00:00Z',
@@ -181,7 +181,7 @@ export class KashflowDatabase {
         fee: 0,
         currency: 'USD',
         recipientName: 'Patrick M.',
-        recipientAccount: '+243 81 999 1234',
+        recipientAccount: '+243 810 000 001',
         provider: 'SHWARY',
         providerReference: 'SHW-P-887412',
         description: 'Transfer to Patrick',
@@ -198,7 +198,7 @@ export class KashflowDatabase {
         amount: 45000, // $450.00
         fee: 650,      // $6.50
         currency: 'USD',
-        recipientName: 'Junior Ngwej',
+        recipientName: 'KASHFLOW Demo User',
         provider: 'PAYPAL',
         providerReference: 'PAYPAL-CAP-99120',
         description: 'Payment received',
