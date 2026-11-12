@@ -19,7 +19,10 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
   const [orderCreated, setOrderCreated] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [successPayload, setSuccessPayload] = useState<any>(null);
-  const [copied, setCopied] = useState(false);\n  const [shwaryPhone, setShwaryPhone] = useState('');\n  const [shwaryAmount, setShwaryAmount] = useState('100');\n  const [shwaryResult, setShwaryResult] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
+  const [shwaryPhone, setShwaryPhone] = useState('');
+  const [shwaryAmount, setShwaryAmount] = useState('100');
+  const [shwaryResult, setShwaryResult] = useState<any>(null);
 
   if (!isOpen) return null;
 
