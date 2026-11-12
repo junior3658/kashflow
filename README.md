@@ -186,7 +186,7 @@ The tracked `.env.example` documents the required server-side configuration name
 | `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
 | `SHWARY_BASE_URL` | Shwary API base URL; defaults to `https://api.shwary.com` |
 | `SHWARY_MODE` | `sandbox` by default; use `production` only after provider approval |
-| `SHWARY_CALLBACK_URL` | Public HTTPS callback URL, required in both modes |
+| `SHWARY_CALLBACK_URL` | Optional in Sandbox; required in production |
 | `PAYPAL_CLIENT_ID` | PayPal Sandbox client identifier (future live adapter wiring) |
 | `PAYPAL_CLIENT_SECRET` | PayPal Sandbox secret (future live adapter wiring) |
 | `PAYPAL_BASE_URL` | PayPal API base URL; Sandbox by default |
