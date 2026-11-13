@@ -342,13 +342,13 @@ apiRouter.get('/crypto/markets', (req: Request, res: Response) => {
 });
 
 apiRouter.get('/crypto/portfolio', (req: Request, res: Response) => {
-  res.json(CryptoSimulationService.getPortfolio());
+  res.json(CryptoSimulationService.getPortfolio((req as any).userId));
 });
 
 apiRouter.post('/crypto/trade', (req: Request, res: Response) => {
   try {
     const { symbol, side, amountUsd } = req.body;
-    const position = CryptoSimulationService.executeSimulatedTrade(symbol, side, Number(amountUsd));
+    const position = CryptoSimulationService.executeSimulatedTrade((req as any).userId, symbol, side, Number(amountUsd));
     res.json({ success: true, position });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
