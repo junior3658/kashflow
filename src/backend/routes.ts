@@ -81,6 +81,16 @@ apiRouter.post('/auth/logout', (req: Request, res: Response) => {
 // The Shwary provider callback is explicitly exempted in requireAuth and does not
 // settle funds until its signature/event contract is implemented.
 apiRouter.use(requireAuth);
+apiRouter.use('/admin', (req: Request, res: Response, next: any) => {
+  const user = db.users.get((req as any).userId);
+  if (!user || user.role !== 'PLATFORM_ADMIN') return res.status(403).json({ error: 'Platform administrator access required.' });
+  next();
+});
+apiRouter.use('/audit', (req: Request, res: Response, next: any) => {
+  const user = db.users.get((req as any).userId);
+  if (!user || user.role !== 'PLATFORM_ADMIN') return res.status(403).json({ error: 'Platform administrator access required.' });
+  next();
+});
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
   const userId = (req as any).userId;
