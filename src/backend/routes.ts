@@ -359,7 +359,7 @@ apiRouter.post('/crypto/trade', (req: Request, res: Response) => {
 // 9. KASH AI MULTI-AGENT CHAT & INTELLIGENCE
 // -------------------------------------------------------------
 apiRouter.get('/ai/history', (req: Request, res: Response) => {
-  res.json({ messages: AIOrchestrator.getConversationHistory() });
+  res.json({ messages: AIOrchestrator.getConversationHistory((req as any).userId) });
 });
 
 apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
@@ -383,7 +383,7 @@ apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
 });
 
 apiRouter.post('/ai/clear', (req: Request, res: Response) => {
-  AIOrchestrator.clearHistory();
+  AIOrchestrator.clearHistory((req as any).userId);
   res.json({ success: true });
 });
 
@@ -391,7 +391,7 @@ apiRouter.post('/ai/clear', (req: Request, res: Response) => {
 // 10. AUDIT & SYSTEM HEALTH
 // -------------------------------------------------------------
 apiRouter.get('/audit/logs', (req: Request, res: Response) => {
-  res.json({ logs: db.auditLogs });
+  res.json({ logs: db.auditLogs.filter((log) => log.actorUserId === (req as any).userId) });
 });
 
 apiRouter.get('/admin/health', (req: Request, res: Response) => {
