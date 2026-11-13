@@ -6,6 +6,7 @@
 import { testLedgerEngine } from './ledger.test';
 import { testAIAgents } from './agents.test';
 import { testSecurityAuditScenarios } from './audit-scenarios.test';
+import { testTransactionSafety } from './transactions.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -14,6 +15,7 @@ async function runAll() {
 
   try {
     await testLedgerEngine();
+    await testTransactionSafety();
     console.log('');
     await testAIAgents();
     console.log('');
