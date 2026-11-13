@@ -54,7 +54,7 @@ export async function verifyEmail(emailInput:string,code:string){
  const email=emailNorm(emailInput);if(!/^\d{6}$/.test(code))throw new Error('Invalid or expired verification code.');
  const u=sql.prepare('SELECT id,email,full_name,created_at,verified_at FROM auth_users WHERE email=?').get(email) as any;
  if(!u)throw new Error('Invalid or expired verification code.');
- if(u.verified_at)return session(u.id);
+ if(u.verified_at)throw new Error('This email is already verified. Please sign in.');
  const c=sql.prepare('SELECT id,code_hash,expires_at,attempts FROM verification_codes WHERE user_id=? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1').get(u.id) as any;
  if(!c||c.expires_at<=Date.now()||c.attempts>=5)throw new Error('Invalid or expired verification code.');
  const actual=Buffer.from(sha(c.id+':'+code)),expected=Buffer.from(c.code_hash);
