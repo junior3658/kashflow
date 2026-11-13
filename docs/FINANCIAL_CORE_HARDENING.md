@@ -7,16 +7,17 @@
 
 - Transaction amounts must be positive safe integers in minor currency units.
 - A source wallet must exist, be active, match the transaction currency, and belong to the authenticated user or the explicitly supplied organization.
-- Idempotency keys are scoped by user rather than shared globally.
+- Idempotency keys are scoped by user and reused keys are rejected when the transaction's financial payload differs.
 - A transaction must be `PENDING` before the generic execution engine can settle it.
 - Generic execution is restricted to `INTERNAL` USD transactions. External provider transactions cannot be marked successful by the generic engine.
 - Pending funds and the wallet balance are checked before settlement.
 - The balanced ledger batch is posted before the in-memory wallet balance is changed.
-- Internal wallet operations no longer overwrite the provider-reported balance with the internal accounting balance.
+- Internal wallet debits and credits no longer overwrite the provider-reported balance with the internal accounting balance.
+- The simulated PayPal order endpoint is disabled; it no longer returns a fake checkout URL as if a provider order had been created.
 - The transfer API creates a reservation before returning a draft and rejects provider values other than `INTERNAL`.
 - PayPal capture is temporarily disabled because the prototype does not yet persist PayPal order ownership or implement an atomic, idempotent capture-to-ledger workflow.
 - Malformed percent-encoded session cookies are rejected safely.
-- Transaction safety regression tests cover successful pending settlement, cross-tenant wallet rejection, external-provider settlement rejection, and insufficient-funds reservation rejection.
+- Transaction safety regression tests now cover successful pending settlement, cross-tenant wallet rejection, external-provider settlement rejection, insufficient-funds reservation rejection, idempotency payload conflicts, and separation of internal/provider balances.
 
 ## Important limitations
 
