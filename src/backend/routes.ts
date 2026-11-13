@@ -131,27 +131,39 @@ apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
   try {
-    const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body;
+    const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body || {};
     const userId = (req as any).userId as string;
+    if (provider && provider !== 'INTERNAL') {
+      return res.status(409).json({ error: 'External providers must use their dedicated verified payment flow; generic transfer confirmation cannot settle them.' });
+    }
+    if (currency && currency !== 'USD') {
+      return res.status(409).json({ error: 'Internal transfers are temporarily limited to USD while currency-specific ledger accounts are completed.' });
+    }
+    const numericAmount = Number(amount);
+    const amountCents = Math.round(numericAmount * 100);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isSafeInteger(amountCents)) {
+      return res.status(400).json({ error: 'Amount must be a positive valid USD amount.' });
+    }
+    const currentOrgId = db.users.get(userId)?.currentOrgId;
     const ownedWallet = Array.from(db.wallets.values()).find((wallet) =>
-      wallet.id === sourceWalletId && (wallet.ownerId === userId ||
-        (db.users.get(userId)?.currentOrgId && wallet.ownerId === db.users.get(userId)?.currentOrgId))
+      wallet.id === sourceWalletId && (wallet.ownerId === userId || (!!currentOrgId && wallet.ownerId === currentOrgId))
     );
     if (!ownedWallet) return res.status(403).json({ error: 'Source wallet is not available to this account.' });
-    const amountCents = Math.round(Number(amount) * 100);
     const draft = TransactionEngine.createDraft({
-      idempotencyKey,
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined,
       userId,
+      orgId: ownedWallet.ownerId === currentOrgId ? currentOrgId : undefined,
       type: 'TRANSFER',
       sourceWalletId: ownedWallet.id,
       amount: amountCents,
-      currency: currency || 'USD',
-      recipientName: recipientName || 'Beneficiary',
-      recipientAccount,
-      provider: provider || 'INTERNAL',
-      description: `Transfer to ${recipientName || 'Beneficiary'}`,
+      currency: 'USD',
+      recipientName: typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary',
+      recipientAccount: typeof recipientAccount === 'string' ? recipientAccount.slice(0, 160) : undefined,
+      provider: 'INTERNAL',
+      description: `Transfer to ${typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary'}`,
     });
-    res.json({ draft });
+    if (draft.status === 'CREATED') TransactionEngine.markPending(draft.id);
+    res.status(201).json({ draft: db.transactions.get(draft.id) || draft });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -197,30 +209,12 @@ apiRouter.post('/payments/paypal/orders', async (req: Request, res: Response) =>
   }
 });
 
-apiRouter.post('/payments/paypal/capture', async (req: Request, res: Response) => {
-  try {
-    const { orderId } = req.body;
-    const capture = await paypalAdapter.captureOrder(orderId);
-    const destinationWallet = Array.from(db.wallets.values()).find((wallet) => wallet.ownerId === (req as any).userId && wallet.currency === 'USD');
-    if (!destinationWallet) return res.status(400).json({ error: 'A USD wallet is not configured for this account.' });
-
-    // Record verified transaction in KASHFLOW ledger
-    const tx = TransactionEngine.createDraft({
-      userId: (req as any).userId,
-      type: 'PAYPAL_PAYMENT',
-      sourceWalletId: 'paypal_ext_buyer',
-      destinationWalletId: destinationWallet.id,
-      amount: capture.amount,
-      currency: capture.currency,
-      provider: 'PAYPAL',
-      description: `PayPal Capture ${capture.captureId}`,
-    });
-
-    const settled = TransactionEngine.executeTransaction(tx.id, capture.captureId);
-    res.json({ capture, transaction: settled });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/payments/paypal/capture', (_req: Request, res: Response) => {
+  // The current prototype does not persist PayPal order ownership or implement
+  // a verified capture-to-ledger settlement workflow. Do not capture funds.
+  res.status(503).json({
+    error: 'PayPal capture is disabled until order ownership, verified capture records, idempotency and atomic ledger settlement are implemented.',
+  });
 });
 
 // -------------------------------------------------------------
