@@ -34,6 +34,26 @@ export function AuthPage({ initialMode, onBack, onAuthenticated }: AuthPageProps
     finally { setBusy(false); }
   }
 
+  async function resendCode() {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const response = await fetch('/api/v1/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Unable to resend the code.');
+      setMode('verify');
+      setNotice('If this account needs verification, a new code has been sent.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to resend the code.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#061c19] px-5 py-12 text-[#f5f4ec]">
       <div className="fixed inset-0 overflow-hidden pointer-events-none"><div className="absolute -left-40 -top-40 h-96 w-96 rounded-full bg-emerald-500/15 blur-[120px]"/><div className="absolute -bottom-40 -right-20 h-96 w-96 rounded-full bg-amber-300/10 blur-[120px]"/></div>
