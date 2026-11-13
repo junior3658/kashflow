@@ -94,8 +94,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    refreshData();
-  }, []);
+    if (authStatus === 'authenticated') refreshData();
+  }, [authStatus]);
 
   if (authStatus === 'checking') {
     return <div className="grid min-h-screen place-items-center bg-[#061c19] text-emerald-100">KASHFLOW · Loading secure workspace…</div>;
