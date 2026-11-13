@@ -54,4 +54,31 @@ export async function testTransactionSafety() {
   catch { insufficientFundsRejected = true; }
   if (!insufficientFundsRejected) throw new Error('Insufficient funds were not rejected during reservation.');
   console.log('✓ Insufficient funds reservation check passed.');
+  let idempotencyConflictRejected = false;
+  try {
+    TransactionEngine.createDraft({
+      userId, type: 'TRANSFER', sourceWalletId, amount: 2000, currency: 'USD',
+      provider: 'INTERNAL', description: 'Different payload with same key',
+      idempotencyKey: 'transaction-safety-test-001',
+    });
+  } catch { idempotencyConflictRejected = true; }
+  if (!idempotencyConflictRejected) {
+    throw new Error('Reusing an idempotency key with a different amount was not rejected.');
+  }
+  console.log('✓ Idempotency payload conflict check passed.');
+
+  const walletBeforeCredit = db.wallets.get(sourceWalletId)!;
+  const providerBalanceBeforeCredit = walletBeforeCredit.externalProviderBalance;
+  const internalBalanceBeforeCredit = walletBeforeCredit.internalAccountingBalance;
+  const { WalletService } = await import('../src/backend/wallets');
+  WalletService.applySettledCredit(sourceWalletId, 250);
+  if (walletBeforeCredit.externalProviderBalance !== providerBalanceBeforeCredit) {
+    throw new Error('An internal ledger credit incorrectly changed the provider balance.');
+  }
+  if (walletBeforeCredit.internalAccountingBalance !== internalBalanceBeforeCredit + 250) {
+    throw new Error('Internal wallet credit was not applied.');
+  }
+  walletBeforeCredit.internalAccountingBalance = internalBalanceBeforeCredit;
+  console.log('✓ Internal/provider balance separation check passed.');
+
 }
