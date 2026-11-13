@@ -293,7 +293,7 @@ The tracked `.env.example` documents the required server-side configuration name
 | `PAYPAL_BASE_URL` | PayPal API base URL; Sandbox by default |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook identifier for future verification |
 
-Shwary collection uses the server-side merchant credentials when configured. PayPal remains a mock adapter until its OAuth and REST calls are implemented. Never place secrets in frontend code, screenshots, commits or public documentation.
+Shwary collection sends a server-side Sandbox request when valid merchant credentials are configured; its callback is not yet verified and does not settle a wallet. PayPal order/capture routes are disabled; setting PayPal credentials does not enable checkout. Never place secrets in frontend code, screenshots, commits or public documentation.
 
 ## Tests
 
@@ -378,12 +378,12 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the current security design notes.
 - [x] AI agent modules and conversational interface
 - [x] PayPal and Shwary adapter interfaces
 - [x] Currency exchange and crypto paper-trading modules
-- [ ] Replace in-memory storage with durable database persistence
-- [ ] Implement real authentication and authorization
-- [ ] Integrate and verify PayPal Sandbox REST API end to end
+- [ ] Replace in-memory financial-domain storage with durable, atomic SQLite persistence
+- [x] Implement email/password authentication, email verification and session authorization (feature branch; financial data remains in-memory)
+- [ ] Integrate and verify PayPal Sandbox REST API end to end (currently disabled)
 - [ ] Integrate Shwary using approved merchant documentation and credentials
 - [ ] Add provider webhook endpoints and genuine signature verification
-- [ ] Add CI workflow, deployment configuration and end-to-end tests
+- [ ] Establish passing CI, deployment configuration and end-to-end tests
 - [ ] Complete security, privacy and regulatory readiness review
 
 ## Documentation
