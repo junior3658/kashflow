@@ -133,46 +133,144 @@ More detail is available in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [do
 
 ## Run locally
 
-### Prerequisites
+### 1. Prerequisites
 
-- Node.js 22 or a compatible supported Node.js version
-- npm 10+
+Install the following software before cloning the project:
 
-### Installation
+- **Node.js 22.13 or newer** (64-bit LTS recommended). Check with `node --version`.
+- **npm 10 or newer**. Check with `npm --version`.
+- **Git**.
+- A Windows, macOS or Linux terminal.
+
+The project uses `better-sqlite3`, a native Node.js module. On Windows, use a current 64-bit Node.js installation. If npm reports that it cannot find a prebuilt binary and tries to compile the module, install the Visual Studio C++ Build Tools (Desktop development with C++) and retry.
+
+### 2. Clone the repository
+
+Open PowerShell, Windows Terminal, macOS Terminal or Linux shell:
 
 ```bash
 git clone https://github.com/junior3658/kashflow.git
 cd kashflow
+```
+
+To use the latest integration branch before it is merged into `main`:
+
+```bash
+git switch feature/public-home-auth
+git pull origin feature/public-home-auth
+```
+
+Once the integration has been merged, use `git switch main` and `git pull origin main` instead.
+
+### 3. Install dependencies
+
+```bash
 npm install
 ```
 
-### Configure environment variables
+Wait for the installation to finish. Do not run `npm run dev` if npm reports an installation error. If dependency resolution fails, use Node.js 22.13+ and a recent npm version, remove only the generated `node_modules` directory, then run `npm install` again. Do not delete the project source files.
 
-Create a local `.env` file from the example:
+### 4. Create your local environment file
+
+**Windows PowerShell:**
+
+```powershell
+Copy-Item .env.example .env
+```
+
+**macOS / Linux:**
 
 ```bash
 cp .env.example .env
 ```
 
-Then set the values required for the features you want to try. Do not commit your real API keys or secrets.
+Open `.env` in VS Code and configure the server-side variables. Keep this file private: it is ignored by Git and must never be committed, pasted into issues, or placed in frontend code.
 
-### Start the application
+#### Minimum configuration for email registration
+
+Email verification uses Resend. Configure:
+
+```env
+APP_URL="http://localhost:3000"
+RESEND_API_KEY="re_your_resend_api_key"
+RESEND_FROM_EMAIL="KASHFLOW <noreply@your-verified-domain.com>"
+AUTH_DATABASE_PATH="data/kashflow-auth.sqlite"
+```
+
+In Resend, verify the sending domain/address first. The value in `RESEND_FROM_EMAIL` must be an allowed sender for that Resend account. Without a working Resend configuration, account verification emails cannot be delivered and registration will fail.
+
+#### Optional AI configuration
+
+```env
+GEMINI_API_KEY="your_gemini_api_key"
+```
+
+Leave it empty if you are not testing the AI features. Never use a key prefixed with `VITE_`; provider secrets must remain on the backend.
+
+#### Optional Shwary Sandbox configuration
+
+```env
+SHWARY_MERCHANT_ID="your_sandbox_merchant_id"
+SHWARY_MERCHANT_KEY="your_sandbox_merchant_key"
+SHWARY_BASE_URL="https://api.shwary.com"
+SHWARY_MODE="sandbox"
+SHWARY_CALLBACK_URL=""
+```
+
+Use the sandbox credentials supplied by Shwary. Do not switch to production until Shwary has approved the merchant account and provided the callback/signature, payout and balance specifications. An accepted collection request is not proof of a completed payment; the current callback does not verify provider signatures or settle a wallet.
+
+#### PayPal
+
+PayPal variables are reserved in `.env.example`, but PayPal checkout and capture routes are intentionally disabled. Adding a Client ID and Secret alone will **not** activate PayPal. Real OAuth, order/capture requests, webhook signature verification, persistent order ownership and reconciliation must be completed first.
+
+### 5. Start in development mode
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open **http://localhost:3000** in your browser. Keep the terminal open while using the application. Press `Ctrl+C` to stop the server.
 
-The development server starts Express and mounts the Vite middleware in the same process.
+### 6. Run quality checks
 
-### Production build
+Run these before treating a change as valid:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+All three commands must finish successfully. A successful frontend build alone does not certify provider integrations or financial correctness.
+
+### 7. Production-mode local preview
+
+Build the frontend first:
 
 ```bash
 npm run build
 ```
 
-The repository also defines `npm start` for starting the Express server in production mode after the frontend build has been generated.
+**Windows PowerShell:**
+
+```powershell
+$env:NODE_ENV = "production"
+npm start
+```
+
+**macOS / Linux:**
+
+```bash
+NODE_ENV=production npm start
+```
+
+Then open http://localhost:3000. This is a local production-mode preview, not a deployment or a production-readiness certification.
+
+### 8. Local database files
+
+The authentication database is created automatically at the path configured by `AUTH_DATABASE_PATH` (default: `data/kashflow-auth.sqlite`). Keep the `data/` directory private and back it up securely. Do not upload SQLite database files to GitHub.
+
+**Important financial-data limitation:** authentication records persist in SQLite, but the financial prototype's wallets, transactions, organizations and ledger are still held in process memory at this stage. They reset when the server restarts. Do not deposit, transfer or store real customer funds in this prototype.
 
 ## Environment configuration
 
