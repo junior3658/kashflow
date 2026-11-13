@@ -57,7 +57,6 @@ export class WalletService {
 
     wallet.internalAccountingBalance -= amount;
     wallet.pendingDebits = Math.max(0, wallet.pendingDebits - amount);
-    wallet.externalProviderBalance = wallet.internalAccountingBalance;
     wallet.updatedAt = new Date().toISOString();
     return wallet;
   }
