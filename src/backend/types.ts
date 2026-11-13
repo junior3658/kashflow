@@ -196,6 +196,7 @@ export interface AIIntentExtraction {
 
 export interface AIMessage {
   id: string;
+  userId?: string;
   sender: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
