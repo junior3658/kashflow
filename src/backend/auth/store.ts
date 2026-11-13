@@ -36,7 +36,8 @@ async function sendCode(u:any){
  const now=Date.now(),last=sql.prepare('SELECT created_at FROM verification_codes WHERE user_id=? ORDER BY created_at DESC LIMIT 1').get(u.id) as any;
  if(last&&now-last.created_at<60000)throw new Error('Please wait before requesting another verification email.');
  const code=String(randomInt(0,1000000)).padStart(6,'0'),id=randomBytes(16).toString('hex');
- sql.prepare('INSERT INTO verification_codes(id,user_id,code_hash,expires_at,created_at) VALUES(?,?,?,?,?)').run(id,u.id,sha(id+':'+code),now+CODE_MS,now);
+ const codeHash=await passwordHash(code,id);
+ sql.prepare('INSERT INTO verification_codes(id,user_id,code_hash,expires_at,created_at) VALUES(?,?,?,?,?)').run(id,u.id,codeHash,now+CODE_MS,now);
  await sendVerificationEmail({to:u.email,fullName:u.full_name,code,expiresInMinutes:10});
 }
 export async function registerAccount(v:{fullName:string;email:string;password:string}){
@@ -57,7 +58,7 @@ export async function verifyEmail(emailInput:string,code:string){
  if(u.verified_at)throw new Error('This email is already verified. Please sign in.');
  const c=sql.prepare('SELECT id,code_hash,expires_at,attempts FROM verification_codes WHERE user_id=? AND consumed_at IS NULL ORDER BY created_at DESC LIMIT 1').get(u.id) as any;
  if(!c||c.expires_at<=Date.now()||c.attempts>=5)throw new Error('Invalid or expired verification code.');
- const actual=Buffer.from(sha(c.id+':'+code)),expected=Buffer.from(c.code_hash);
+ const actual=Buffer.from(await passwordHash(code,c.id),'hex'),expected=Buffer.from(c.code_hash,'hex');
  if(!timingSafeEqual(actual,expected)){sql.prepare('UPDATE verification_codes SET attempts=attempts+1 WHERE id=?').run(c.id);throw new Error('Invalid or expired verification code.');}
  sql.prepare('UPDATE verification_codes SET consumed_at=? WHERE id=?').run(Date.now(),c.id);
  sql.prepare('UPDATE auth_users SET verified_at=? WHERE id=?').run(new Date().toISOString(),u.id);
