@@ -37,7 +37,23 @@ export class TransactionEngine {
     if (scopedKey && db.idempotencyStore.has(scopedKey)) {
       const existingRecord = db.idempotencyStore.get(scopedKey)!;
       const tx = db.transactions.get(existingRecord.transactionId);
-      if (tx && tx.userId === params.userId) return tx;
+      if (tx && tx.userId === params.userId) {
+        // An idempotency key identifies one immutable request, not merely one user.
+        // Reject accidental or malicious reuse with different financial parameters.
+        const sameRequest =
+          tx.type === params.type &&
+          tx.sourceWalletId === params.sourceWalletId &&
+          tx.destinationWalletId === params.destinationWalletId &&
+          tx.amount === params.amount &&
+          tx.currency === params.currency &&
+          tx.provider === params.provider &&
+          tx.recipientName === params.recipientName &&
+          tx.recipientAccount === params.recipientAccount;
+        if (!sameRequest) {
+          throw new Error('Idempotency key has already been used with a different transaction payload.');
+        }
+        return tx;
+      }
     }
 
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0) {
