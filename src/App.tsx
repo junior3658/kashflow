@@ -19,8 +19,12 @@ import { SendMoneyModal } from './components/personal/SendMoneyModal';
 import { ReceiveMoneyModal } from './components/personal/ReceiveMoneyModal';
 import { KashAIChat } from './components/ai/KashAIChat';
 import { Wallet, Transaction } from './backend/types';
+import { LandingPage } from './components/landing/LandingPage';
+import { AuthPage } from './components/auth/AuthPage';
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState<'checking' | 'guest' | 'authenticated'>('checking');
+  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>('landing');
   const [portalMode, setPortalMode] = useState<'personal' | 'business' | 'admin'>('personal');
   const [currentTab, setCurrentTab] = useState<NavTab>('personal_dashboard');
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -62,6 +66,12 @@ export default function App() {
     }
   }, [isDark]);
 
+  useEffect(() => {
+    fetch('/api/v1/auth/me', { credentials: 'include' })
+      .then((response) => setAuthStatus(response.ok ? 'authenticated' : 'guest'))
+      .catch(() => setAuthStatus('guest'));
+  }, []);
+
   // Fetch Wallets & Transactions
   const refreshData = async () => {
     try {
@@ -86,6 +96,14 @@ export default function App() {
   useEffect(() => {
     refreshData();
   }, []);
+
+  if (authStatus === 'checking') {
+    return <div className="grid min-h-screen place-items-center bg-[#061c19] text-emerald-100">KASHFLOW · Loading secure workspace…</div>;
+  }
+  if (authStatus === 'guest') {
+    if (authView === 'landing') return <LandingPage onSignIn={() => setAuthView('login')} onGetStarted={() => setAuthView('register')} />;
+    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={() => { setAuthStatus('authenticated'); setAuthView('landing'); refreshData(); }} />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col font-sans transition-colors duration-150">
