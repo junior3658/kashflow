@@ -65,6 +65,7 @@ export async function verifyEmail(emailInput:string,code:string){
 }
 export async function resendVerification(emailInput:string){const u=sql.prepare('SELECT id,email,full_name,verified_at FROM auth_users WHERE email=?').get(emailNorm(emailInput)) as any;if(u&&!u.verified_at)await sendCode(u);}
 export async function loginAccount(emailInput:string,password:string){
+ if(typeof password!=='string'||password.length<1||password.length>128)throw new Error('Email or password is incorrect.');
  const u=sql.prepare('SELECT id,password_hash,password_salt,verified_at FROM auth_users WHERE email=?').get(emailNorm(emailInput)) as any;
  if(!u){await passwordHash(password,randomBytes(16).toString('hex'));throw new Error('Email or password is incorrect.');}
  const actual=Buffer.from(await passwordHash(password,u.password_salt),'hex'),expected=Buffer.from(u.password_hash,'hex');
