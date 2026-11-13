@@ -16,9 +16,10 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
+  app.disable('x-powered-by');
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '32kb' }));
 
   // Mount KASHFLOW API Router
   app.use('/api/v1', apiRouter);
