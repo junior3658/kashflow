@@ -181,7 +181,7 @@ The tracked `.env.example` documents the required server-side configuration name
 | Variable | Purpose |
 |---|---|
 | `GEMINI_API_KEY` | Gemini API access for AI features |
-| `APP_URL` | Public application URL where required by hosted flows |
+| `APP_URL` | Public application URL where required by hosted flows |\n| `RESEND_API_KEY` | Resend API key for server-side verification email delivery |\n| `RESEND_FROM_EMAIL` | Sender identity verified in Resend |\n| `AUTH_DATABASE_PATH` | SQLite file path for authentication accounts and sessions |
 | `SHWARY_MERCHANT_ID` | Shwary merchant UUID (server-side only) |
 | `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
 | `SHWARY_BASE_URL` | Shwary API base URL; defaults to `https://api.shwary.com` |
@@ -259,7 +259,7 @@ KASHFLOW is a demonstration and research prototype, not a bank, payment institut
 
 Before any real-money pilot, the project requires, at minimum:
 
-- Real authentication, session management and server-side authorization.
+- Complete persistent financial-domain storage, migrations and concurrency-safe authorization. Basic account authentication is implemented on the feature branch, but the financial domain is still in-memory.
 - Persistent transactional database, migrations, constraints and concurrency controls.
 - Provider API integration using official documentation and securely managed credentials.
 - Authentic webhook signature verification, replay protection and idempotent event handling.
@@ -286,7 +286,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the current security design notes.
 
 ## Documentation
 
-- [System architecture](docs/ARCHITECTURE.md)
+- [Authentication implementation and limitations](docs/AUTHENTICATION.md)\n- [System architecture](docs/ARCHITECTURE.md)
 - [Financial core and ledger](docs/FINANCIAL_CORE.md)
 - [AI architecture](docs/AI_ARCHITECTURE.md)
 - [Security notes](docs/SECURITY.md)
