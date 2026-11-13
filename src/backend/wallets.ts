@@ -66,7 +66,8 @@ export class WalletService {
     if (!wallet) throw new Error(`Wallet '${walletId}' not found.`);
 
     wallet.internalAccountingBalance += amount;
-    wallet.externalProviderBalance = wallet.internalAccountingBalance;
+    // A local ledger credit is not evidence of funds held by a payment provider.
+    // externalProviderBalance is updated only by a verified provider reconciliation.
     wallet.updatedAt = new Date().toISOString();
     return wallet;
   }
