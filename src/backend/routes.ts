@@ -143,7 +143,9 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
   try {
-    const existing = db.transactions.get(req.params.id);\n    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });\n    const tx = TransactionEngine.executeTransaction(req.params.id);
+    const existing = db.transactions.get(req.params.id);
+    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
+    const tx = TransactionEngine.executeTransaction(req.params.id);
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -152,7 +154,9 @@ apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
   try {
-    const existing = db.transactions.get(req.params.id);\n    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });\n    const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
+    const existing = db.transactions.get(req.params.id);
+    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
+    const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
