@@ -148,17 +148,20 @@ export class TransactionEngine {
       throw new Error('Internal ledger settlement is temporarily limited to USD.');
     }
 
+    const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    const settlementTotal = tx.amount + tx.fee;
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (sourceWallet.currency !== tx.currency || sourceWallet.pendingDebits < settlementTotal ||
+        sourceWallet.internalAccountingBalance < settlementTotal) {
+      throw new Error('Reserved funds or wallet balance are inconsistent; settlement was stopped.');
+    }
+
     tx.status = 'PROCESSING';
     tx.updatedAt = new Date().toISOString();
 
     try {
-      // 1. Settle balances
-      WalletService.applySettledDebit(tx.sourceWalletId, tx.amount + tx.fee);
-      if (tx.destinationWalletId && db.wallets.has(tx.destinationWalletId)) {
-        WalletService.applySettledCredit(tx.destinationWalletId, tx.amount);
-      }
-
-      // 2. Commit balanced double-entry ledger entries
+      // 1. Post the balanced ledger batch first. All account and balance invariants
+      // are validated before the wallet mutation; no provider is called here.
       LedgerEngine.postTransaction(tx.id, [
         {
           accountCode: '1010', // User Cash Account
@@ -186,6 +189,12 @@ export class TransactionEngine {
             ]
           : []),
       ]);
+
+      // 2. Apply the corresponding wallet mutation after the ledger batch succeeds.
+      WalletService.applySettledDebit(tx.sourceWalletId, settlementTotal);
+      if (tx.destinationWalletId && db.wallets.has(tx.destinationWalletId)) {
+        WalletService.applySettledCredit(tx.destinationWalletId, tx.amount);
+      }
 
       tx.status = 'SUCCEEDED';
       if (providerRef) tx.providerReference = providerRef;
