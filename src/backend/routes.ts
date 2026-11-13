@@ -16,29 +16,79 @@ import { AIOrchestrator } from './ai/orchestrator';
 import { SecurityAuditSuite } from './security/audit-scenarios';
 import { LedgerEngine } from './ledger';
 import { LLMProvider } from './ai/llm-provider';
+import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
+import { requireAuth, readCookie } from './auth/middleware';
 
 export const apiRouter = Router();
 
-// Current active authenticated session user (defaulting to Junior)
-let currentSessionUserId = 'usr_junior_01';
+// Public authentication endpoints. A small per-process throttle is a prototype
+// safeguard; production deployment must also enforce edge/IP rate limits.
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+function authThrottle(req: Request, res: Response, next: any) {
+  const key = `${req.ip}:${req.path}`, now = Date.now();
+  const entry = authAttempts.get(key);
+  if (!entry || entry.resetAt <= now) authAttempts.set(key, { count: 1, resetAt: now + 15 * 60_000 });
+  else if (++entry.count > 10) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+  next();
+}
 
-// -------------------------------------------------------------
-// 1. AUTH & IDENTITY
-// -------------------------------------------------------------
-apiRouter.get('/auth/me', (req: Request, res: Response) => {
-  const user = db.users.get(currentSessionUserId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const org = user.currentOrgId ? db.organizations.get(user.currentOrgId) : null;
-  res.json({ user, organization: org });
+apiRouter.post('/auth/register', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { fullName, email, password } = req.body || {};
+    if (typeof fullName !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Full name, email and password are required.' });
+    }
+    await registerAccount({ fullName, email, password });
+    res.status(201).json({ success: true, message: 'Verification email sent.' });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Registration failed.' }); }
 });
 
-apiRouter.post('/auth/switch-role', (req: Request, res: Response) => {
-  const { role, orgId } = req.body;
-  const user = db.users.get(currentSessionUserId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  if (role) user.role = role;
-  if (orgId !== undefined) user.currentOrgId = orgId;
-  res.json({ success: true, user });
+apiRouter.post('/auth/verify-email', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body || {};
+    if (typeof email !== 'string' || typeof code !== 'string') return res.status(400).json({ error: 'Email and verification code are required.' });
+    const token = await verifyEmail(email, code);
+    setSessionCookie(res, token);
+    res.json({ success: true });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Verification failed.' }); }
+});
+
+apiRouter.post('/auth/resend-verification', authThrottle, async (req: Request, res: Response) => {
+  try {
+    if (typeof req.body?.email !== 'string') return res.status(400).json({ error: 'Email is required.' });
+    await resendVerification(req.body.email);
+    res.json({ success: true, message: 'If the account needs verification, an email will be sent.' });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Unable to send verification email.' }); }
+});
+
+apiRouter.post('/auth/login', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'Email and password are required.' });
+    const token = await loginAccount(email, password);
+    setSessionCookie(res, token);
+    res.json({ success: true });
+  } catch (error: any) { res.status(401).json({ error: error.message || 'Sign in failed.' }); }
+});
+
+apiRouter.post('/auth/logout', (req: Request, res: Response) => {
+  revokeSession(readCookie(req, SESSION_COOKIE_NAME));
+  clearSessionCookie(res);
+  res.json({ success: true });
+});
+
+// All remaining application endpoints require a valid, verified session.
+// The Shwary provider callback is explicitly exempted in requireAuth and does not
+// settle funds until its signature/event contract is implemented.
+apiRouter.use(requireAuth);
+
+apiRouter.get('/auth/me', (req: Request, res: Response) => {
+  const userId = (req as any).userId;
+  const user = publicUser(userId);
+  if (!user) return res.status(401).json({ error: 'Authentication required.' });
+  const runtimeUser = db.users.get(userId);
+  const org = runtimeUser?.currentOrgId ? db.organizations.get(runtimeUser.currentOrgId) : null;
+  res.json({ user, organization: org });
 });
 
 // -------------------------------------------------------------
@@ -46,7 +96,7 @@ apiRouter.post('/auth/switch-role', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 apiRouter.get('/wallets', (req: Request, res: Response) => {
   const type = req.query.type as any;
-  const user = db.users.get(currentSessionUserId)!;
+  const user = db.users.get((req as any).userId)!;
   const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
   const wallets = WalletService.getWalletsByOwner(ownerId, type);
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);
@@ -57,7 +107,7 @@ apiRouter.get('/wallets', (req: Request, res: Response) => {
 // 3. TRANSACTIONS
 // -------------------------------------------------------------
 apiRouter.get('/transactions', (req: Request, res: Response) => {
-  const list = Array.from(db.transactions.values()).sort(
+  const list = Array.from(db.transactions.values()).filter((tx) => tx.userId === (req as any).userId).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
   res.json({ transactions: list });
@@ -65,7 +115,7 @@ apiRouter.get('/transactions', (req: Request, res: Response) => {
 
 apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
   const tx = db.transactions.get(req.params.id);
-  if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+  if (!tx || tx.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found' });
   res.json({ transaction: tx });
 });
 
@@ -75,7 +125,7 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
     const amountCents = Math.round(Number(amount) * 100);
     const draft = TransactionEngine.createDraft({
       idempotencyKey,
-      userId: currentSessionUserId,
+      userId: (req as any).userId,
       type: 'TRANSFER',
       sourceWalletId: sourceWalletId || 'wlt_personal_usd',
       amount: amountCents,
@@ -93,7 +143,7 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
   try {
-    const tx = TransactionEngine.executeTransaction(req.params.id);
+    const existing = db.transactions.get(req.params.id);\n    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });\n    const tx = TransactionEngine.executeTransaction(req.params.id);
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -102,7 +152,7 @@ apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
   try {
-    const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
+    const existing = db.transactions.get(req.params.id);\n    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });\n    const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -134,7 +184,7 @@ apiRouter.post('/payments/paypal/capture', async (req: Request, res: Response) =
 
     // Record verified transaction in KASHFLOW ledger
     const tx = TransactionEngine.createDraft({
-      userId: currentSessionUserId,
+      userId: (req as any).userId,
       type: 'PAYPAL_PAYMENT',
       sourceWalletId: 'paypal_ext_buyer',
       destinationWalletId: 'wlt_personal_usd',
@@ -239,10 +289,10 @@ apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
     const quote = CurrencyExchangeService.createQuote(from, to, amountCents);
 
     const sourceWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === currentSessionUserId && w.currency === from
+      (w) => w.ownerId === (req as any).userId && w.currency === from
     );
     const destWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === currentSessionUserId && w.currency === to
+      (w) => w.ownerId === (req as any).userId && w.currency === to
     );
 
     if (!sourceWallet || !destWallet) {
@@ -255,7 +305,7 @@ apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
     WalletService.applySettledCredit(destWallet.id, quote.toAmount);
 
     const tx = TransactionEngine.createDraft({
-      userId: currentSessionUserId,
+      userId: (req as any).userId,
       type: 'EXCHANGE',
       sourceWalletId: sourceWallet.id,
       destinationWalletId: destWallet.id,
@@ -307,7 +357,7 @@ apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message content is required.' });
     }
 
-    const user = db.users.get(currentSessionUserId)!;
+    const user = db.users.get((req as any).userId)!;
     const responseMessage = await AIOrchestrator.processUserMessage({
       userId: user.id,
       orgId: user.currentOrgId,
