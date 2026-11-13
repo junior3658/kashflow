@@ -30,16 +30,21 @@ export class TransactionEngine {
    * Checks idempotency key to prevent duplicate creation.
    */
   static createDraft(params: CreateDraftParams): Transaction {
-    if (params.idempotencyKey && db.idempotencyStore.has(params.idempotencyKey)) {
-      const existingRecord = db.idempotencyStore.get(params.idempotencyKey)!;
+    if (params.idempotencyKey && (params.idempotencyKey.length > 128 || params.idempotencyKey.trim() !== params.idempotencyKey)) {
+      throw new Error('Idempotency key must be 1–128 characters without surrounding whitespace.');
+    }
+    const scopedKey = params.idempotencyKey ? `${params.userId}:${params.idempotencyKey}` : undefined;
+    if (scopedKey && db.idempotencyStore.has(scopedKey)) {
+      const existingRecord = db.idempotencyStore.get(scopedKey)!;
       const tx = db.transactions.get(existingRecord.transactionId);
-      if (tx) {
-        return tx;
-      }
+      if (tx && tx.userId === params.userId) return tx;
     }
 
-    if (params.amount <= 0) {
-      throw new Error('Transaction amount must be strictly positive.');
+    if (!Number.isSafeInteger(params.amount) || params.amount <= 0) {
+      throw new Error('Transaction amount must be a positive safe integer in minor currency units.');
+    }
+    if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
+      throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }
 
     // Verify source wallet exists
@@ -47,6 +52,13 @@ export class TransactionEngine {
     if (!sourceWallet) {
       throw new Error(`Source wallet '${params.sourceWalletId}' does not exist.`);
     }
+    if (sourceWallet.ownerId !== params.userId && (!params.orgId || sourceWallet.ownerId !== params.orgId)) {
+      throw new Error('Source wallet does not belong to the authenticated user or authorized organization.');
+    }
+    if (sourceWallet.currency !== params.currency) {
+      throw new Error('Transaction currency must match the source wallet currency.');
+    }
+    if (sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is not active.');
 
     // Calculate indicative processing fee
     let fee = 0;
@@ -84,8 +96,8 @@ export class TransactionEngine {
 
     db.transactions.set(txId, transaction);
 
-    if (params.idempotencyKey) {
-      db.idempotencyStore.set(params.idempotencyKey, {
+    if (scopedKey) {
+      db.idempotencyStore.set(scopedKey, {
         transactionId: txId,
         response: transaction,
         createdAt: Date.now(),
@@ -107,6 +119,9 @@ export class TransactionEngine {
     }
 
     // Reserve funds in wallet
+    const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (sourceWallet.currency !== tx.currency) throw new Error('Source wallet currency mismatch.');
     WalletService.reservePendingDebit(tx.sourceWalletId, tx.amount + tx.fee);
 
     tx.status = 'PENDING';
@@ -123,8 +138,14 @@ export class TransactionEngine {
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
-    if (tx.status !== 'PENDING' && tx.status !== 'CREATED') {
-      throw new Error(`Cannot execute transaction in status '${tx.status}'.`);
+    if (tx.status !== 'PENDING') {
+      throw new Error(`Execution requires a PENDING transaction; current status is '${tx.status}'.`);
+    }
+    if (tx.provider !== 'INTERNAL') {
+      throw new Error('External-provider transactions cannot be settled by the generic execution engine. A verified provider confirmation is required.');
+    }
+    if (tx.currency !== 'USD') {
+      throw new Error('Internal ledger settlement is temporarily limited to USD.');
     }
 
     tx.status = 'PROCESSING';
