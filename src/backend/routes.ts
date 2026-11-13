@@ -122,12 +122,18 @@ apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
 apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
   try {
     const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body;
+    const userId = (req as any).userId as string;
+    const ownedWallet = Array.from(db.wallets.values()).find((wallet) =>
+      wallet.id === sourceWalletId && (wallet.ownerId === userId ||
+        (db.users.get(userId)?.currentOrgId && wallet.ownerId === db.users.get(userId)?.currentOrgId))
+    );
+    if (!ownedWallet) return res.status(403).json({ error: 'Source wallet is not available to this account.' });
     const amountCents = Math.round(Number(amount) * 100);
     const draft = TransactionEngine.createDraft({
       idempotencyKey,
-      userId: (req as any).userId,
+      userId,
       type: 'TRANSFER',
-      sourceWalletId: sourceWalletId || 'wlt_personal_usd',
+      sourceWalletId: ownedWallet.id,
       amount: amountCents,
       currency: currency || 'USD',
       recipientName: recipientName || 'Beneficiary',
@@ -185,13 +191,15 @@ apiRouter.post('/payments/paypal/capture', async (req: Request, res: Response) =
   try {
     const { orderId } = req.body;
     const capture = await paypalAdapter.captureOrder(orderId);
+    const destinationWallet = Array.from(db.wallets.values()).find((wallet) => wallet.ownerId === (req as any).userId && wallet.currency === 'USD');
+    if (!destinationWallet) return res.status(400).json({ error: 'A USD wallet is not configured for this account.' });
 
     // Record verified transaction in KASHFLOW ledger
     const tx = TransactionEngine.createDraft({
       userId: (req as any).userId,
       type: 'PAYPAL_PAYMENT',
       sourceWalletId: 'paypal_ext_buyer',
-      destinationWalletId: 'wlt_personal_usd',
+      destinationWalletId: destinationWallet.id,
       amount: capture.amount,
       currency: capture.currency,
       provider: 'PAYPAL',
