@@ -7,7 +7,7 @@
 - Resend email delivery through the Resend HTTPS API. The API key and sender address are read only by the backend.
 - Password hashing with Node.js scrypt and a per-account random salt.
 - SQLite persistence for authentication users, verification codes and sessions.
-- Verification codes are stored as SHA-256 hashes, expire after ten minutes, and have a five-attempt limit.
+- Verification codes are stored as salted scrypt hashes, expire after ten minutes, and have a five-attempt limit. Passwords are also stored as salted scrypt hashes.
 - Opaque random session tokens are stored as SHA-256 hashes and delivered in HttpOnly, SameSite=Lax cookies.
 - Protected application API routes, per-user transaction reads, wallet ownership checks, per-user AI conversation history and per-user audit-log reads.
 - Basic per-process authentication throttling. Production must also apply rate limits at the reverse proxy or hosting edge.
