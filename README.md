@@ -46,7 +46,7 @@ The repository currently contains the following prototype modules:
 | Financial ledger | Debit/credit validation, reversal logic, trial-balance calculation | In-memory implementation |
 | Wallets | USD, EUR and CDF wallet models and balance views | Seeded demo data |
 | Transactions | Draft, confirmation, cancellation and transaction-state logic | Local simulation |
-| PayPal | Order/capture adapter contract and checkout-style flow | **Mock adapter; no live PayPal API calls yet** |
+| PayPal | Mock adapter contract retained for development | **Checkout/order and capture API routes disabled; no live PayPal API calls** |
 | Shwary | DRC CDF collection endpoint wired to the supplied API sample | **Sandbox request integration; B2C payout and balance pending official endpoint specifications** |
 | Provider routing | Provider option and fee-routing logic | Prototype |
 | Currency exchange | Quote and conversion workflow | Local/demo rate implementation |
@@ -75,7 +75,7 @@ Transparency matters in financial software. The following limitations are intent
 3. **Shwary:** the documented DRC collection endpoint now makes a server-side API request in Sandbox by default. Payout and merchant-balance operations are not enabled because the supplied sample does not document their endpoints or response contracts. A collection request accepted by HTTP is not proof of a completed payment; settlement requires verified provider confirmation.
 4. **Shwary settlement boundary:** the project does not assume that collected C2B funds can be reused directly for B2C payouts. That capability remains unconfirmed and is treated as a settlement/compliance boundary.
 5. **Persistence:** application data is held in an in-memory database seeded at startup. Data is reset when the server process restarts. A durable production database and migrations are not yet integrated.
-6. **Authentication:** the current API uses a seeded demo session identity. The role-switch route is for prototype demonstration, not production authentication or authorization.
+6. **Authentication:** email/password registration, email verification and session authentication are implemented with a separate SQLite auth store. Financial wallets, ledger entries, transactions and organization data remain in-memory; authentication persistence does not make the financial core durable.
 7. **AI:** the AI assistant can help interpret and prepare requests; it must not be treated as an autonomous payment authority. AI output is not a source of truth for balances, fees, provider status or transaction completion.
 8. **Crypto:** digital-asset operations are paper-trading simulations only. No custody, wallet keys, deposits, withdrawals or on-chain trades are provided.
 
