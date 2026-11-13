@@ -194,19 +194,13 @@ apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 4. PAYPAL INTEGRATION
 // -------------------------------------------------------------
-apiRouter.post('/payments/paypal/orders', async (req: Request, res: Response) => {
-  try {
-    const { amount, currency, description } = req.body;
-    const amountCents = Math.round(Number(amount) * 100);
-    const order = await paypalAdapter.createOrder({
-      amountCents,
-      currency: currency || 'USD',
-      description: description || 'PayPal Payment to KASHFLOW',
-    });
-    res.json(order);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/payments/paypal/orders', (_req: Request, res: Response) => {
+  // The current adapter returns a simulated order and approval URL; it does not
+  // create an order with PayPal. Keep this endpoint disabled to avoid presenting
+  // a mock checkout as a real payment flow.
+  res.status(503).json({
+    error: 'PayPal checkout is disabled until real OAuth, order creation, ownership persistence, webhook verification and reconciliation are implemented.',
+  });
 });
 
 apiRouter.post('/payments/paypal/capture', (_req: Request, res: Response) => {
