@@ -308,6 +308,7 @@ apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
   try {
     const { from, to, amount } = req.body;
     const amountCents = Math.round(Number(amount) * 100);
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
     const quote = CurrencyExchangeService.createQuote(from, to, amountCents);
 
     const sourceWallet = Array.from(db.wallets.values()).find(
@@ -319,6 +320,9 @@ apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
 
     if (!sourceWallet || !destWallet) {
       return res.status(400).json({ error: `Wallets for exchange pair ${from} -> ${to} not configured.` });
+    }
+    if (sourceWallet.internalAccountingBalance - sourceWallet.pendingDebits < amountCents) {
+      return res.status(400).json({ error: 'Insufficient available balance.' });
     }
 
     // Debit source
@@ -358,7 +362,11 @@ apiRouter.get('/crypto/portfolio', (req: Request, res: Response) => {
 apiRouter.post('/crypto/trade', (req: Request, res: Response) => {
   try {
     const { symbol, side, amountUsd } = req.body;
-    const position = CryptoSimulationService.executeSimulatedTrade((req as any).userId, symbol, side, Number(amountUsd));
+    const numericAmount = Number(amountUsd);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !['BUY', 'SELL'].includes(side)) {
+      return res.status(400).json({ error: 'A positive amount and valid trade side are required.' });
+    }
+    const position = CryptoSimulationService.executeSimulatedTrade((req as any).userId, symbol, side, numericAmount);
     res.json({ success: true, position });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
