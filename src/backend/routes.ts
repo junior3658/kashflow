@@ -292,48 +292,13 @@ apiRouter.post('/exchange/quote', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
-  try {
-    const { from, to, amount } = req.body;
-    const amountCents = Math.round(Number(amount) * 100);
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
-    const quote = CurrencyExchangeService.createQuote(from, to, amountCents);
-
-    const sourceWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === (req as any).userId && w.currency === from
-    );
-    const destWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === (req as any).userId && w.currency === to
-    );
-
-    if (!sourceWallet || !destWallet) {
-      return res.status(400).json({ error: `Wallets for exchange pair ${from} -> ${to} not configured.` });
-    }
-    if (sourceWallet.internalAccountingBalance - sourceWallet.pendingDebits < amountCents) {
-      return res.status(400).json({ error: 'Insufficient available balance.' });
-    }
-
-    // Debit source
-    WalletService.applySettledDebit(sourceWallet.id, amountCents);
-    // Credit destination with converted amount
-    WalletService.applySettledCredit(destWallet.id, quote.toAmount);
-
-    const tx = TransactionEngine.createDraft({
-      userId: (req as any).userId,
-      type: 'EXCHANGE',
-      sourceWalletId: sourceWallet.id,
-      destinationWalletId: destWallet.id,
-      amount: amountCents,
-      currency: from,
-      provider: 'EXCHANGE_DESK',
-      description: `Exchange ${amount} ${from} to ${to}`,
-    });
-    tx.status = 'SUCCEEDED';
-
-    res.json({ success: true, quote, transaction: tx });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/exchange/execute', (_req: Request, res: Response) => {
+  // Quote calculation is available for demonstration, but this endpoint previously
+  // mutated wallet balances and marked a transaction SUCCEEDED without a balanced
+  // ledger posting, durable idempotency or an atomic reservation/settlement.
+  res.status(503).json({
+    error: 'Exchange settlement is disabled until quote ownership, expiry validation, idempotency and atomic double-entry ledger settlement are implemented.',
+  });
 });
 
 // -------------------------------------------------------------
