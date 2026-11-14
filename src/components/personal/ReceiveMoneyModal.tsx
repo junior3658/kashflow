@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { X, QrCode, Copy } from 'lucide-react';
-import { Currency } from '../../backend/types';
+import { X } from 'lucide-react';
 
 interface ReceiveMoneyModalProps {
   isOpen: boolean;
@@ -12,10 +11,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'paypal' | 'shwary' | 'qr'>('paypal');
-  const [amount, setAmount] = useState('100.00');
-  const [currency, setCurrency] = useState<Currency>('USD');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [shwaryPhone, setShwaryPhone] = useState('');
   const [shwaryAmount, setShwaryAmount] = useState('100');
   const [shwaryResult, setShwaryResult] = useState<any>(null);
@@ -43,12 +39,6 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard?.writeText(`https://pay.kashflow.io/u/junior?amount=${amount}&currency=${currency}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -94,7 +84,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
               activeTab === 'qr' ? 'bg-white text-neutral-950 shadow-xs dark:bg-neutral-800 dark:text-white' : 'text-neutral-600 hover:text-neutral-950 dark:text-neutral-400'
             }`}
           >
-            Payment Link / QR
+            Payment Link / QR · Soon
           </button>
         </div>
 
@@ -176,26 +166,16 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
           </div>
         )}
 
-        {/* PAYMENT LINK & QR TAB */}
+        {/* PAYMENT LINK AND QR STATUS */}
         {activeTab === 'qr' && (
-          <div className="text-center space-y-4 pt-2">
-            <div className="w-36 h-36 mx-auto bg-neutral-100 dark:bg-white rounded-2xl p-2.5 flex items-center justify-center border border-neutral-200 shadow-sm">
-              <QrCode className="w-full h-full text-neutral-950" />
-            </div>
-
-            <div className="text-xs text-neutral-600 dark:text-neutral-400">
-              Share your direct payment link to receive funds into your primary USD wallet.
-            </div>
-
-            <button
-              onClick={handleCopyLink}
-              className="w-full py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>{copied ? 'Copied to Clipboard!' : 'Copy Payment Link'}</span>
-            </button>
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-2">
+            <div className="font-bold text-sm">Payment links and QR codes are not enabled</div>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              The hosted payment page and verified checkout flow have not been implemented. KASHFLOW will not generate a placeholder URL that could be mistaken for a working payment link.
+            </p>
           </div>
         )}
+
       </div>
     </div>
   );
