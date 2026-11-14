@@ -49,7 +49,7 @@ The repository currently contains the following prototype modules:
 | PayPal | Mock adapter contract retained for development | **Checkout/order and capture API routes disabled; no live PayPal API calls** |
 | Shwary | DRC CDF collection endpoint wired to the supplied API sample | **Sandbox request integration; B2C payout and balance pending official endpoint specifications** |
 | Provider routing | Provider option and fee-routing logic | Prototype |
-| Currency exchange | Quote and conversion workflow | Local/demo rate implementation |
+| Currency exchange | Indicative quote calculation | **Settlement endpoint disabled until atomic ledger posting, quote expiry and idempotency are implemented** |
 | Digital assets | BTC, ETH and USDT portfolio and trade simulation | Simulation only; no blockchain transactions |
 | KASH AI | NLP, financial intelligence, assistant and orchestration modules | Depends on configured Gemini access |
 | Security scenarios | Ten scenario definitions and a test runner | Prototype regression tests; not a formal security certification |
