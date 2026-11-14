@@ -16,29 +16,91 @@ import { AIOrchestrator } from './ai/orchestrator';
 import { SecurityAuditSuite } from './security/audit-scenarios';
 import { LedgerEngine } from './ledger';
 import { LLMProvider } from './ai/llm-provider';
+import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
+import { requireAuth, readCookie } from './auth/middleware';
 
 export const apiRouter = Router();
 
-// Current active authenticated session user (defaulting to Junior)
-let currentSessionUserId = 'usr_junior_01';
+// Public authentication endpoints. A small per-process throttle is a prototype
+// safeguard; production deployment must also enforce edge/IP rate limits.
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+function authThrottle(req: Request, res: Response, next: any) {
+  const key = `${req.ip}:${req.path}`, now = Date.now();
+  const entry = authAttempts.get(key);
+  if (!entry || entry.resetAt <= now) authAttempts.set(key, { count: 1, resetAt: now + 15 * 60_000 });
+  else if (++entry.count > 10) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+  next();
+}
 
-// -------------------------------------------------------------
-// 1. AUTH & IDENTITY
-// -------------------------------------------------------------
-apiRouter.get('/auth/me', (req: Request, res: Response) => {
-  const user = db.users.get(currentSessionUserId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const org = user.currentOrgId ? db.organizations.get(user.currentOrgId) : null;
-  res.json({ user, organization: org });
+apiRouter.post('/auth/register', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { fullName, email, password, accountType, businessName } = req.body || {};
+    if (typeof fullName !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ error: 'Full name, email and password are required.' });
+    }
+    if (accountType !== undefined && accountType !== 'PERSONAL' && accountType !== 'BUSINESS') return res.status(400).json({ error: 'Choose a personal or business account.' });
+    if (businessName !== undefined && typeof businessName !== 'string') return res.status(400).json({ error: 'Business name must be text.' });
+    await registerAccount({ fullName, email, password, accountType, businessName });
+    res.status(201).json({ success: true, message: 'Verification email sent.' });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Registration failed.' }); }
 });
 
-apiRouter.post('/auth/switch-role', (req: Request, res: Response) => {
-  const { role, orgId } = req.body;
-  const user = db.users.get(currentSessionUserId);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  if (role) user.role = role;
-  if (orgId !== undefined) user.currentOrgId = orgId;
-  res.json({ success: true, user });
+apiRouter.post('/auth/verify-email', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body || {};
+    if (typeof email !== 'string' || typeof code !== 'string') return res.status(400).json({ error: 'Email and verification code are required.' });
+    const token = await verifyEmail(email, code);
+    setSessionCookie(res, token);
+    res.json({ success: true });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Verification failed.' }); }
+});
+
+apiRouter.post('/auth/resend-verification', authThrottle, async (req: Request, res: Response) => {
+  try {
+    if (typeof req.body?.email !== 'string') return res.status(400).json({ error: 'Email is required.' });
+    await resendVerification(req.body.email);
+    res.json({ success: true, message: 'If the account needs verification, an email will be sent.' });
+  } catch (error: any) { res.status(400).json({ error: error.message || 'Unable to send verification email.' }); }
+});
+
+apiRouter.post('/auth/login', authThrottle, async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body || {};
+    if (typeof email !== 'string' || typeof password !== 'string') return res.status(400).json({ error: 'Email and password are required.' });
+    const token = await loginAccount(email, password);
+    setSessionCookie(res, token);
+    res.json({ success: true });
+  } catch (error: any) { res.status(401).json({ error: error.message || 'Sign in failed.' }); }
+});
+
+apiRouter.post('/auth/logout', (req: Request, res: Response) => {
+  revokeSession(readCookie(req, SESSION_COOKIE_NAME));
+  clearSessionCookie(res);
+  res.json({ success: true });
+});
+
+// All remaining application endpoints require a valid, verified session.
+// The Shwary provider callback is explicitly exempted in requireAuth and does not
+// settle funds until its signature/event contract is implemented.
+apiRouter.use(requireAuth);
+apiRouter.use('/admin', (req: Request, res: Response, next: any) => {
+  const user = db.users.get((req as any).userId);
+  if (!user || user.role !== 'PLATFORM_ADMIN') return res.status(403).json({ error: 'Platform administrator access required.' });
+  next();
+});
+apiRouter.use('/audit', (req: Request, res: Response, next: any) => {
+  const user = db.users.get((req as any).userId);
+  if (!user || user.role !== 'PLATFORM_ADMIN') return res.status(403).json({ error: 'Platform administrator access required.' });
+  next();
+});
+
+apiRouter.get('/auth/me', (req: Request, res: Response) => {
+  const userId = (req as any).userId;
+  const user = publicUser(userId);
+  if (!user) return res.status(401).json({ error: 'Authentication required.' });
+  const runtimeUser = db.users.get(userId);
+  const org = runtimeUser?.currentOrgId ? db.organizations.get(runtimeUser.currentOrgId) : null;
+  res.json({ user, organization: org });
 });
 
 // -------------------------------------------------------------
@@ -46,18 +108,24 @@ apiRouter.post('/auth/switch-role', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 apiRouter.get('/wallets', (req: Request, res: Response) => {
   const type = req.query.type as any;
-  const user = db.users.get(currentSessionUserId)!;
+  const user = db.users.get((req as any).userId)!;
   const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
   const wallets = WalletService.getWalletsByOwner(ownerId, type);
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);
-  res.json({ wallets, consolidatedNetWorthUsd: consolidated.totalUsd });
+  res.json({
+    wallets,
+    consolidatedNetWorthUsd: consolidated.totalUsd,
+    consolidatedNetWorthBasis: 'ESTIMATED_FROM_INTERNAL_LEDGER',
+    isConsolidatedNetWorthEstimated: true,
+    providerBalancesVerified: wallets.length > 0 && wallets.every((wallet) => wallet.externalProviderBalanceStatus === 'VERIFIED'),
+  });
 });
 
 // -------------------------------------------------------------
 // 3. TRANSACTIONS
 // -------------------------------------------------------------
 apiRouter.get('/transactions', (req: Request, res: Response) => {
-  const list = Array.from(db.transactions.values()).sort(
+  const list = Array.from(db.transactions.values()).filter((tx) => tx.userId === (req as any).userId).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
   res.json({ transactions: list });
@@ -65,27 +133,45 @@ apiRouter.get('/transactions', (req: Request, res: Response) => {
 
 apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
   const tx = db.transactions.get(req.params.id);
-  if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+  if (!tx || tx.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found' });
   res.json({ transaction: tx });
 });
 
 apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
   try {
-    const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body;
-    const amountCents = Math.round(Number(amount) * 100);
+    const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body || {};
+    const userId = (req as any).userId as string;
+    if (provider && provider !== 'INTERNAL') {
+      return res.status(409).json({ error: 'External providers must use their dedicated verified payment flow; generic transfer confirmation cannot settle them.' });
+    }
+    if (currency && currency !== 'USD') {
+      return res.status(409).json({ error: 'Internal transfers are temporarily limited to USD while currency-specific ledger accounts are completed.' });
+    }
+    const numericAmount = Number(amount);
+    const amountCents = Math.round(numericAmount * 100);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isSafeInteger(amountCents)) {
+      return res.status(400).json({ error: 'Amount must be a positive valid USD amount.' });
+    }
+    const currentOrgId = db.users.get(userId)?.currentOrgId;
+    const ownedWallet = Array.from(db.wallets.values()).find((wallet) =>
+      wallet.id === sourceWalletId && (wallet.ownerId === userId || (!!currentOrgId && wallet.ownerId === currentOrgId))
+    );
+    if (!ownedWallet) return res.status(403).json({ error: 'Source wallet is not available to this account.' });
     const draft = TransactionEngine.createDraft({
-      idempotencyKey,
-      userId: currentSessionUserId,
+      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined,
+      userId,
+      orgId: ownedWallet.ownerId === currentOrgId ? currentOrgId : undefined,
       type: 'TRANSFER',
-      sourceWalletId: sourceWalletId || 'wlt_personal_usd',
+      sourceWalletId: ownedWallet.id,
       amount: amountCents,
-      currency: currency || 'USD',
-      recipientName: recipientName || 'Beneficiary',
-      recipientAccount,
-      provider: provider || 'INTERNAL',
-      description: `Transfer to ${recipientName || 'Beneficiary'}`,
+      currency: 'USD',
+      recipientName: typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary',
+      recipientAccount: typeof recipientAccount === 'string' ? recipientAccount.slice(0, 160) : undefined,
+      provider: 'INTERNAL',
+      description: `Transfer to ${typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary'}`,
     });
-    res.json({ draft });
+    if (draft.status === 'CREATED') TransactionEngine.markPending(draft.id);
+    res.status(201).json({ draft: db.transactions.get(draft.id) || draft });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -93,6 +179,8 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
   try {
+    const existing = db.transactions.get(req.params.id);
+    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
     const tx = TransactionEngine.executeTransaction(req.params.id);
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
@@ -102,6 +190,8 @@ apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
   try {
+    const existing = db.transactions.get(req.params.id);
+    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
     const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
@@ -112,43 +202,21 @@ apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 4. PAYPAL INTEGRATION
 // -------------------------------------------------------------
-apiRouter.post('/payments/paypal/orders', async (req: Request, res: Response) => {
-  try {
-    const { amount, currency, description } = req.body;
-    const amountCents = Math.round(Number(amount) * 100);
-    const order = await paypalAdapter.createOrder({
-      amountCents,
-      currency: currency || 'USD',
-      description: description || 'PayPal Payment to KASHFLOW',
-    });
-    res.json(order);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/payments/paypal/orders', (_req: Request, res: Response) => {
+  // The current adapter returns a simulated order and approval URL; it does not
+  // create an order with PayPal. Keep this endpoint disabled to avoid presenting
+  // a mock checkout as a real payment flow.
+  res.status(503).json({
+    error: 'PayPal checkout is disabled until real OAuth, order creation, ownership persistence, webhook verification and reconciliation are implemented.',
+  });
 });
 
-apiRouter.post('/payments/paypal/capture', async (req: Request, res: Response) => {
-  try {
-    const { orderId } = req.body;
-    const capture = await paypalAdapter.captureOrder(orderId);
-
-    // Record verified transaction in KASHFLOW ledger
-    const tx = TransactionEngine.createDraft({
-      userId: currentSessionUserId,
-      type: 'PAYPAL_PAYMENT',
-      sourceWalletId: 'paypal_ext_buyer',
-      destinationWalletId: 'wlt_personal_usd',
-      amount: capture.amount,
-      currency: capture.currency,
-      provider: 'PAYPAL',
-      description: `PayPal Capture ${capture.captureId}`,
-    });
-
-    const settled = TransactionEngine.executeTransaction(tx.id, capture.captureId);
-    res.json({ capture, transaction: settled });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/payments/paypal/capture', (_req: Request, res: Response) => {
+  // The current prototype does not persist PayPal order ownership or implement
+  // a verified capture-to-ledger settlement workflow. Do not capture funds.
+  res.status(503).json({
+    error: 'PayPal capture is disabled until order ownership, verified capture records, idempotency and atomic ledger settlement are implemented.',
+  });
 });
 
 // -------------------------------------------------------------
@@ -232,44 +300,13 @@ apiRouter.post('/exchange/quote', (req: Request, res: Response) => {
   }
 });
 
-apiRouter.post('/exchange/execute', (req: Request, res: Response) => {
-  try {
-    const { from, to, amount } = req.body;
-    const amountCents = Math.round(Number(amount) * 100);
-    const quote = CurrencyExchangeService.createQuote(from, to, amountCents);
-
-    const sourceWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === currentSessionUserId && w.currency === from
-    );
-    const destWallet = Array.from(db.wallets.values()).find(
-      (w) => w.ownerId === currentSessionUserId && w.currency === to
-    );
-
-    if (!sourceWallet || !destWallet) {
-      return res.status(400).json({ error: `Wallets for exchange pair ${from} -> ${to} not configured.` });
-    }
-
-    // Debit source
-    WalletService.applySettledDebit(sourceWallet.id, amountCents);
-    // Credit destination with converted amount
-    WalletService.applySettledCredit(destWallet.id, quote.toAmount);
-
-    const tx = TransactionEngine.createDraft({
-      userId: currentSessionUserId,
-      type: 'EXCHANGE',
-      sourceWalletId: sourceWallet.id,
-      destinationWalletId: destWallet.id,
-      amount: amountCents,
-      currency: from,
-      provider: 'EXCHANGE_DESK',
-      description: `Exchange ${amount} ${from} to ${to}`,
-    });
-    tx.status = 'SUCCEEDED';
-
-    res.json({ success: true, quote, transaction: tx });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+apiRouter.post('/exchange/execute', (_req: Request, res: Response) => {
+  // Quote calculation is available for demonstration, but this endpoint previously
+  // mutated wallet balances and marked a transaction SUCCEEDED without a balanced
+  // ledger posting, durable idempotency or an atomic reservation/settlement.
+  res.status(503).json({
+    error: 'Exchange settlement is disabled until quote ownership, expiry validation, idempotency and atomic double-entry ledger settlement are implemented.',
+  });
 });
 
 // -------------------------------------------------------------
@@ -280,13 +317,17 @@ apiRouter.get('/crypto/markets', (req: Request, res: Response) => {
 });
 
 apiRouter.get('/crypto/portfolio', (req: Request, res: Response) => {
-  res.json(CryptoSimulationService.getPortfolio());
+  res.json(CryptoSimulationService.getPortfolio((req as any).userId));
 });
 
 apiRouter.post('/crypto/trade', (req: Request, res: Response) => {
   try {
     const { symbol, side, amountUsd } = req.body;
-    const position = CryptoSimulationService.executeSimulatedTrade(symbol, side, Number(amountUsd));
+    const numericAmount = Number(amountUsd);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !['BUY', 'SELL'].includes(side)) {
+      return res.status(400).json({ error: 'A positive amount and valid trade side are required.' });
+    }
+    const position = CryptoSimulationService.executeSimulatedTrade((req as any).userId, symbol, side, numericAmount);
     res.json({ success: true, position });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -297,7 +338,7 @@ apiRouter.post('/crypto/trade', (req: Request, res: Response) => {
 // 9. KASH AI MULTI-AGENT CHAT & INTELLIGENCE
 // -------------------------------------------------------------
 apiRouter.get('/ai/history', (req: Request, res: Response) => {
-  res.json({ messages: AIOrchestrator.getConversationHistory() });
+  res.json({ messages: AIOrchestrator.getConversationHistory((req as any).userId) });
 });
 
 apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
@@ -307,7 +348,7 @@ apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message content is required.' });
     }
 
-    const user = db.users.get(currentSessionUserId)!;
+    const user = db.users.get((req as any).userId)!;
     const responseMessage = await AIOrchestrator.processUserMessage({
       userId: user.id,
       orgId: user.currentOrgId,
@@ -321,7 +362,7 @@ apiRouter.post('/ai/chat', async (req: Request, res: Response) => {
 });
 
 apiRouter.post('/ai/clear', (req: Request, res: Response) => {
-  AIOrchestrator.clearHistory();
+  AIOrchestrator.clearHistory((req as any).userId);
   res.json({ success: true });
 });
 
@@ -329,7 +370,7 @@ apiRouter.post('/ai/clear', (req: Request, res: Response) => {
 // 10. AUDIT & SYSTEM HEALTH
 // -------------------------------------------------------------
 apiRouter.get('/audit/logs', (req: Request, res: Response) => {
-  res.json({ logs: db.auditLogs });
+  res.json({ logs: db.auditLogs.filter((log) => log.actorUserId === (req as any).userId) });
 });
 
 apiRouter.get('/admin/health', (req: Request, res: Response) => {
@@ -337,8 +378,8 @@ apiRouter.get('/admin/health', (req: Request, res: Response) => {
   const aiTelemetry = LLMProvider.getTelemetry();
 
   res.json({
-    status: 'HEALTHY',
-    version: '1.0.0-production',
+    status: 'PROTOTYPE',
+    version: '0.0.0-prototype',
     timestamp: new Date().toISOString(),
     ledger: {
       isBalanced: trialBalance.isBalanced,
@@ -346,9 +387,9 @@ apiRouter.get('/admin/health', (req: Request, res: Response) => {
       totalCreditsUsd: trialBalance.totalCredits / 100,
     },
     providers: {
-      paypal: { status: 'ONLINE', mode: 'SANDBOX' },
+      paypal: { status: 'DISABLED', mode: 'NOT_CONNECTED' },
       shwary: { status: shwaryAdapter.isConfigured() ? 'CONFIGURED' : 'NOT_CONFIGURED', mode: shwaryAdapter.getCapabilities().encashment.mode, boundary: 'SETTLEMENT_VERIFICATION_REQUIRED' },
-      exchangeDesk: { status: 'ONLINE' },
+      exchangeDesk: { status: 'QUOTES_ONLY', settlement: 'DISABLED_PENDING_LEDGER_WORKFLOW' },
       cryptoSimulation: { status: 'ONLINE', mode: 'SIMULATED' },
     },
     aiTelemetry,

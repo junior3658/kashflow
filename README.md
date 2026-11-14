@@ -46,10 +46,10 @@ The repository currently contains the following prototype modules:
 | Financial ledger | Debit/credit validation, reversal logic, trial-balance calculation | In-memory implementation |
 | Wallets | USD, EUR and CDF wallet models and balance views | Seeded demo data |
 | Transactions | Draft, confirmation, cancellation and transaction-state logic | Local simulation |
-| PayPal | Order/capture adapter contract and checkout-style flow | **Mock adapter; no live PayPal API calls yet** |
+| PayPal | Mock adapter contract retained for development | **Checkout/order and capture API routes disabled; no live PayPal API calls** |
 | Shwary | DRC CDF collection endpoint wired to the supplied API sample | **Sandbox request integration; B2C payout and balance pending official endpoint specifications** |
 | Provider routing | Provider option and fee-routing logic | Prototype |
-| Currency exchange | Quote and conversion workflow | Local/demo rate implementation |
+| Currency exchange | Indicative quote calculation | **Settlement endpoint disabled until atomic ledger posting, quote expiry and idempotency are implemented** |
 | Digital assets | BTC, ETH and USDT portfolio and trade simulation | Simulation only; no blockchain transactions |
 | KASH AI | NLP, financial intelligence, assistant and orchestration modules | Depends on configured Gemini access |
 | Security scenarios | Ten scenario definitions and a test runner | Prototype regression tests; not a formal security certification |
@@ -64,7 +64,7 @@ Total Debits = Total Credits
 
 Amounts are represented in integer minor units (for example, cents) in the ledger implementation. A posted correction should be represented by a reversal entry rather than silently editing the original accounting record.
 
-The application distinguishes internal accounting values, provider-related values, pending amounts and simulated crypto values. Demo balances shown in the interface are seeded sample data, not real bank or mobile-money balances.
+The application distinguishes internal accounting values, provider-reported values, pending amounts and simulated crypto values. Seeded internal ledger values are demo data; provider balances start as `NOT_SYNCED` and are not displayed as verified. No seeded amount represents real bank or mobile-money funds.
 
 ## Important implementation boundaries
 
@@ -75,7 +75,7 @@ Transparency matters in financial software. The following limitations are intent
 3. **Shwary:** the documented DRC collection endpoint now makes a server-side API request in Sandbox by default. Payout and merchant-balance operations are not enabled because the supplied sample does not document their endpoints or response contracts. A collection request accepted by HTTP is not proof of a completed payment; settlement requires verified provider confirmation.
 4. **Shwary settlement boundary:** the project does not assume that collected C2B funds can be reused directly for B2C payouts. That capability remains unconfirmed and is treated as a settlement/compliance boundary.
 5. **Persistence:** application data is held in an in-memory database seeded at startup. Data is reset when the server process restarts. A durable production database and migrations are not yet integrated.
-6. **Authentication:** the current API uses a seeded demo session identity. The role-switch route is for prototype demonstration, not production authentication or authorization.
+6. **Authentication:** email/password registration, email verification and session authentication are implemented with a separate SQLite auth store. Financial wallets, ledger entries, transactions and organization data remain in-memory; authentication persistence does not make the financial core durable.
 7. **AI:** the AI assistant can help interpret and prepare requests; it must not be treated as an autonomous payment authority. AI output is not a source of truth for balances, fees, provider status or transaction completion.
 8. **Crypto:** digital-asset operations are paper-trading simulations only. No custody, wallet keys, deposits, withdrawals or on-chain trades are provided.
 
@@ -133,46 +133,144 @@ More detail is available in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [do
 
 ## Run locally
 
-### Prerequisites
+### 1. Prerequisites
 
-- Node.js 22 or a compatible supported Node.js version
-- npm 10+
+Install the following software before cloning the project:
 
-### Installation
+- **Node.js 22.13 or newer** (64-bit LTS recommended). Check with `node --version`.
+- **npm 10 or newer**. Check with `npm --version`.
+- **Git**.
+- A Windows, macOS or Linux terminal.
+
+The project uses `better-sqlite3`, a native Node.js module. On Windows, use a current 64-bit Node.js installation. If npm reports that it cannot find a prebuilt binary and tries to compile the module, install the Visual Studio C++ Build Tools (Desktop development with C++) and retry.
+
+### 2. Clone the repository
+
+Open PowerShell, Windows Terminal, macOS Terminal or Linux shell:
 
 ```bash
 git clone https://github.com/junior3658/kashflow.git
 cd kashflow
+```
+
+To use the latest integration branch before it is merged into `main`:
+
+```bash
+git switch feature/public-home-auth
+git pull origin feature/public-home-auth
+```
+
+Once the integration has been merged, use `git switch main` and `git pull origin main` instead.
+
+### 3. Install dependencies
+
+```bash
 npm install
 ```
 
-### Configure environment variables
+Wait for the installation to finish. Do not run `npm run dev` if npm reports an installation error. If dependency resolution fails, use Node.js 22.13+ and a recent npm version, remove only the generated `node_modules` directory, then run `npm install` again. Do not delete the project source files.
 
-Create a local `.env` file from the example:
+### 4. Create your local environment file
+
+**Windows PowerShell:**
+
+```powershell
+Copy-Item .env.example .env
+```
+
+**macOS / Linux:**
 
 ```bash
 cp .env.example .env
 ```
 
-Then set the values required for the features you want to try. Do not commit your real API keys or secrets.
+Open `.env` in VS Code and configure the server-side variables. Keep this file private: it is ignored by Git and must never be committed, pasted into issues, or placed in frontend code.
 
-### Start the application
+#### Minimum configuration for email registration
+
+Email verification uses Resend. Configure:
+
+```env
+APP_URL="http://localhost:3000"
+RESEND_API_KEY="re_your_resend_api_key"
+RESEND_FROM_EMAIL="KASHFLOW <noreply@your-verified-domain.com>"
+AUTH_DATABASE_PATH="data/kashflow-auth.sqlite"
+```
+
+In Resend, verify the sending domain/address first. The value in `RESEND_FROM_EMAIL` must be an allowed sender for that Resend account. Without a working Resend configuration, account verification emails cannot be delivered and registration will fail.
+
+#### Optional AI configuration
+
+```env
+GEMINI_API_KEY="your_gemini_api_key"
+```
+
+Leave it empty if you are not testing the AI features. Never use a key prefixed with `VITE_`; provider secrets must remain on the backend.
+
+#### Optional Shwary Sandbox configuration
+
+```env
+SHWARY_MERCHANT_ID="your_sandbox_merchant_id"
+SHWARY_MERCHANT_KEY="your_sandbox_merchant_key"
+SHWARY_BASE_URL="https://api.shwary.com"
+SHWARY_MODE="sandbox"
+SHWARY_CALLBACK_URL=""
+```
+
+Use the sandbox credentials supplied by Shwary. Do not switch to production until Shwary has approved the merchant account and provided the callback/signature, payout and balance specifications. An accepted collection request is not proof of a completed payment; the current callback does not verify provider signatures or settle a wallet.
+
+#### PayPal
+
+PayPal variables are reserved in `.env.example`, but PayPal checkout and capture routes are intentionally disabled. Adding a Client ID and Secret alone will **not** activate PayPal. Real OAuth, order/capture requests, webhook signature verification, persistent order ownership and reconciliation must be completed first.
+
+### 5. Start in development mode
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open **http://localhost:3000** in your browser. Keep the terminal open while using the application. Press `Ctrl+C` to stop the server.
 
-The development server starts Express and mounts the Vite middleware in the same process.
+### 6. Run quality checks
 
-### Production build
+Run these before treating a change as valid:
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+All three commands must finish successfully. A successful frontend build alone does not certify provider integrations or financial correctness.
+
+### 7. Production-mode local preview
+
+Build the frontend first:
 
 ```bash
 npm run build
 ```
 
-The repository also defines `npm start` for starting the Express server in production mode after the frontend build has been generated.
+**Windows PowerShell:**
+
+```powershell
+$env:NODE_ENV = "production"
+npm start
+```
+
+**macOS / Linux:**
+
+```bash
+NODE_ENV=production npm start
+```
+
+Then open http://localhost:3000. This is a local production-mode preview, not a deployment or a production-readiness certification.
+
+### 8. Local database files
+
+The authentication database is created automatically at the path configured by `AUTH_DATABASE_PATH` (default: `data/kashflow-auth.sqlite`). Keep the `data/` directory private and back it up securely. Do not upload SQLite database files to GitHub.
+
+**Important financial-data limitation:** authentication records persist in SQLite, but the financial prototype's wallets, transactions, organizations and ledger are still held in process memory at this stage. They reset when the server restarts. Do not deposit, transfer or store real customer funds in this prototype.
 
 ## Environment configuration
 
@@ -182,6 +280,9 @@ The tracked `.env.example` documents the required server-side configuration name
 |---|---|
 | `GEMINI_API_KEY` | Gemini API access for AI features |
 | `APP_URL` | Public application URL where required by hosted flows |
+| `RESEND_API_KEY` | Resend API key for server-side verification email delivery |
+| `RESEND_FROM_EMAIL` | Sender identity verified in Resend |
+| `AUTH_DATABASE_PATH` | SQLite file path for authentication accounts and sessions |
 | `SHWARY_MERCHANT_ID` | Shwary merchant UUID (server-side only) |
 | `SHWARY_MERCHANT_KEY` | Shwary merchant secret (server-side only) |
 | `SHWARY_BASE_URL` | Shwary API base URL; defaults to `https://api.shwary.com` |
@@ -192,7 +293,7 @@ The tracked `.env.example` documents the required server-side configuration name
 | `PAYPAL_BASE_URL` | PayPal API base URL; Sandbox by default |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook identifier for future verification |
 
-Shwary collection uses the server-side merchant credentials when configured. PayPal remains a mock adapter until its OAuth and REST calls are implemented. Never place secrets in frontend code, screenshots, commits or public documentation.
+Shwary collection sends a server-side Sandbox request when valid merchant credentials are configured; its callback is not yet verified and does not settle a wallet. PayPal order/capture routes are disabled; setting PayPal credentials does not enable checkout. Never place secrets in frontend code, screenshots, commits or public documentation.
 
 ## Tests
 
@@ -233,6 +334,7 @@ kashflow/
 ├── src/
 │   ├── backend/
 │   │   ├── ai/
+│   │   ├── auth/
 │   │   ├── providers/
 │   │   ├── security/
 │   │   ├── db.ts
@@ -259,7 +361,7 @@ KASHFLOW is a demonstration and research prototype, not a bank, payment institut
 
 Before any real-money pilot, the project requires, at minimum:
 
-- Real authentication, session management and server-side authorization.
+- Complete persistent financial-domain storage, migrations and concurrency-safe authorization. Basic account authentication is implemented on the feature branch, but the financial domain is still in-memory.
 - Persistent transactional database, migrations, constraints and concurrency controls.
 - Provider API integration using official documentation and securely managed credentials.
 - Authentic webhook signature verification, replay protection and idempotent event handling.
@@ -276,16 +378,17 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the current security design notes.
 - [x] AI agent modules and conversational interface
 - [x] PayPal and Shwary adapter interfaces
 - [x] Currency exchange and crypto paper-trading modules
-- [ ] Replace in-memory storage with durable database persistence
-- [ ] Implement real authentication and authorization
-- [ ] Integrate and verify PayPal Sandbox REST API end to end
+- [ ] Replace in-memory financial-domain storage with durable, atomic SQLite persistence
+- [x] Implement email/password authentication, email verification and session authorization (feature branch; financial data remains in-memory)
+- [ ] Integrate and verify PayPal Sandbox REST API end to end (currently disabled)
 - [ ] Integrate Shwary using approved merchant documentation and credentials
 - [ ] Add provider webhook endpoints and genuine signature verification
-- [ ] Add CI workflow, deployment configuration and end-to-end tests
+- [ ] Establish passing CI, deployment configuration and end-to-end tests
 - [ ] Complete security, privacy and regulatory readiness review
 
 ## Documentation
 
+- [Authentication implementation and limitations](docs/AUTHENTICATION.md)
 - [System architecture](docs/ARCHITECTURE.md)
 - [Financial core and ledger](docs/FINANCIAL_CORE.md)
 - [AI architecture](docs/AI_ARCHITECTURE.md)

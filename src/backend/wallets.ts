@@ -29,13 +29,18 @@ export class WalletService {
 
   static reservePendingDebit(walletId: string, amount: number): Wallet {
     const wallet = db.wallets.get(walletId);
-    if (!wallet) {
-      throw new Error(`Wallet '${walletId}' not found.`);
+    if (!wallet) throw new Error(`Wallet '${walletId}' not found.`);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new Error('Reservation amount must be a positive safe integer in minor units.');
     }
+    if (wallet.status !== 'ACTIVE') throw new Error('Wallet is not active.');
 
     const available = wallet.internalAccountingBalance - wallet.pendingDebits;
     if (available < amount) {
       throw new InsufficientFundsError(available, amount, wallet.currency);
+    }
+    if (!Number.isSafeInteger(wallet.pendingDebits + amount)) {
+      throw new Error('Pending reservation exceeds the safe integer range.');
     }
 
     wallet.pendingDebits += amount;
@@ -46,7 +51,11 @@ export class WalletService {
   static releasePendingDebit(walletId: string, amount: number): Wallet {
     const wallet = db.wallets.get(walletId);
     if (!wallet) throw new Error(`Wallet '${walletId}' not found.`);
-    wallet.pendingDebits = Math.max(0, wallet.pendingDebits - amount);
+    if (!Number.isSafeInteger(amount) || amount <= 0 || wallet.pendingDebits < amount) {
+      throw new Error('Pending reservation release does not match the reserved amount.');
+    }
+
+    wallet.pendingDebits -= amount;
     wallet.updatedAt = new Date().toISOString();
     return wallet;
   }
@@ -54,10 +63,16 @@ export class WalletService {
   static applySettledDebit(walletId: string, amount: number): Wallet {
     const wallet = db.wallets.get(walletId);
     if (!wallet) throw new Error(`Wallet '${walletId}' not found.`);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new Error('Settlement debit must be a positive safe integer in minor units.');
+    }
+    if (wallet.status !== 'ACTIVE') throw new Error('Wallet is not active.');
+    if (wallet.internalAccountingBalance < amount || wallet.pendingDebits < amount) {
+      throw new Error('Settlement debit requires sufficient balance and a matching pending reservation.');
+    }
 
     wallet.internalAccountingBalance -= amount;
-    wallet.pendingDebits = Math.max(0, wallet.pendingDebits - amount);
-    wallet.externalProviderBalance = wallet.internalAccountingBalance;
+    wallet.pendingDebits -= amount;
     wallet.updatedAt = new Date().toISOString();
     return wallet;
   }
@@ -65,9 +80,16 @@ export class WalletService {
   static applySettledCredit(walletId: string, amount: number): Wallet {
     const wallet = db.wallets.get(walletId);
     if (!wallet) throw new Error(`Wallet '${walletId}' not found.`);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      throw new Error('Settlement credit must be a positive safe integer in minor units.');
+    }
+    if (!Number.isSafeInteger(wallet.internalAccountingBalance + amount)) {
+      throw new Error('Wallet credit exceeds the safe integer range.');
+    }
 
     wallet.internalAccountingBalance += amount;
-    wallet.externalProviderBalance = wallet.internalAccountingBalance;
+    // A local ledger credit is not evidence of funds held by a payment provider.
+    // externalProviderBalance is updated only by a verified provider reconciliation.
     wallet.updatedAt = new Date().toISOString();
     return wallet;
   }

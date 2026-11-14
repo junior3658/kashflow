@@ -1,23 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeftRight, Clock, ShieldCheck, CheckCircle2, TrendingUp, AlertCircle } from 'lucide-react';
+import { ArrowLeftRight, AlertCircle } from 'lucide-react';
 import { Currency, ExchangeQuote, Wallet } from '../../backend/types';
 
 interface CurrencyExchangeViewProps {
   wallets: Wallet[];
-  onExchangeCompleted: () => void;
 }
 
 export const CurrencyExchangeView: React.FC<CurrencyExchangeViewProps> = ({
   wallets,
-  onExchangeCompleted,
 }) => {
   const [fromCurrency, setFromCurrency] = useState<Currency>('USD');
   const [toCurrency, setToCurrency] = useState<Currency>('EUR');
   const [amount, setAmount] = useState('200.00');
   const [quote, setQuote] = useState<ExchangeQuote | null>(null);
   const [isQuoting, setIsQuoting] = useState(false);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [successTx, setSuccessTx] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchQuote = async () => {
@@ -46,30 +42,6 @@ export const CurrencyExchangeView: React.FC<CurrencyExchangeViewProps> = ({
     fetchQuote();
   }, [fromCurrency, toCurrency, amount]);
 
-  const handleExecuteExchange = async () => {
-    if (!quote) return;
-    setIsExecuting(true);
-    setErrorMsg(null);
-
-    try {
-      const res = await fetch('/api/v1/exchange/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: fromCurrency, to: toCurrency, amount: parseFloat(amount) }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Exchange failed');
-
-      setSuccessTx(data.transaction);
-      onExchangeCompleted();
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
   const handleInvert = () => {
     const prevFrom = fromCurrency;
     setFromCurrency(toCurrency);
@@ -81,7 +53,7 @@ export const CurrencyExchangeView: React.FC<CurrencyExchangeViewProps> = ({
       <div>
         <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 dark:text-white tracking-tight">Currency Exchange Desk</h2>
         <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">
-          Real-time institutional spreads across US Dollar (USD), Euro (EUR), and Congolese Franc (CDF).
+          Indicative prototype quotes using local reference rates. No currency conversion or wallet settlement is currently enabled.
         </p>
       </div>
 
@@ -146,7 +118,7 @@ export const CurrencyExchangeView: React.FC<CurrencyExchangeViewProps> = ({
           </div>
         </div>
 
-        {/* Live Quote Breakdown */}
+        {/* Indicative Quote Breakdown */}
         {quote && (
           <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 space-y-2 text-xs">
             <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
@@ -162,28 +134,21 @@ export const CurrencyExchangeView: React.FC<CurrencyExchangeViewProps> = ({
               </span>
             </div>
             <div className="flex justify-between text-neutral-600 dark:text-neutral-400">
-              <span>Quote Validity Timestamp:</span>
+              <span>Preview expiry (not a guarantee):</span>
               <span className="text-neutral-900 dark:text-white font-mono font-semibold">
-                Guaranteed until {new Date(quote.expiresAt).toLocaleTimeString()}
+                {new Date(quote.expiresAt).toLocaleTimeString()}
               </span>
             </div>
           </div>
         )}
 
-        <button
-          onClick={handleExecuteExchange}
-          disabled={isExecuting || !quote || fromCurrency === toCurrency}
-          className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          <span>{isExecuting ? 'Settling Currency Exchange...' : `Convert ${fromCurrency} to ${toCurrency}`}</span>
-        </button>
+        <div className="w-full py-3.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 font-bold text-sm text-center border border-neutral-200 dark:border-neutral-700">
+          Exchange settlement disabled pending persistent atomic ledger implementation
+        </div>
 
-        {successTx && (
-          <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-900 dark:text-white flex items-center gap-2 font-semibold">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-            <span>Exchange executed and credited to your {toCurrency} wallet!</span>
-          </div>
-        )}
+        <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+          This quote is informational only. It does not reserve funds, create a transaction or credit a wallet.
+        </p>
       </div>
     </div>
   );

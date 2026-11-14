@@ -110,7 +110,8 @@ export class KashflowDatabase {
       currency: 'USD',
       name: 'Primary USD Wallet',
       internalAccountingBalance: 1284050, // $12,840.50 (in cents)
-      externalProviderBalance: 1284050,
+      externalProviderBalance: 0,
+      externalProviderBalanceStatus: 'NOT_SYNCED',
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -125,7 +126,8 @@ export class KashflowDatabase {
       currency: 'EUR',
       name: 'Euro Settlement Wallet',
       internalAccountingBalance: 420000, // €4,200.00
-      externalProviderBalance: 420000,
+      externalProviderBalance: 0,
+      externalProviderBalanceStatus: 'NOT_SYNCED',
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -140,7 +142,8 @@ export class KashflowDatabase {
       currency: 'CDF',
       name: 'Congolese Franc Mobile Cash',
       internalAccountingBalance: 2850000000, // 28,500,000 CDF
-      externalProviderBalance: 2850000000,
+      externalProviderBalance: 0,
+      externalProviderBalanceStatus: 'NOT_SYNCED',
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -155,7 +158,8 @@ export class KashflowDatabase {
       currency: 'USD',
       name: 'KashFlow Commercial Treasury',
       internalAccountingBalance: 8425000, // $84,250.00
-      externalProviderBalance: 8425000,
+      externalProviderBalance: 0,
+      externalProviderBalanceStatus: 'NOT_SYNCED',
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',

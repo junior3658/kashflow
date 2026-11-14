@@ -7,7 +7,6 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { apiRouter } from './src/backend/routes';
 
 dotenv.config();
 
@@ -15,10 +14,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function startServer() {
+  // Load .env before importing adapters and the SQLite auth store.
+  const { apiRouter } = await import('./src/backend/routes');
   const app = express();
+  app.disable('x-powered-by');
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '32kb' }));
 
   // Mount KASHFLOW API Router
   app.use('/api/v1', apiRouter);

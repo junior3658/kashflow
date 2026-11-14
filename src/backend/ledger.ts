@@ -1,7 +1,7 @@
 /**
  * KASHFLOW Double-Entry Ledger Engine
- * Invariant: SUM(DEBITS) === SUM(CREDITS)
- * Immutable postings with auditable reversal entries.
+ * Invariant: SUM(DEBITS) === SUM(CREDITS) for each currency.
+ * Posted entries are append-only; corrections use reversal batches.
  */
 
 import { db } from './db';
@@ -17,111 +17,121 @@ export class UnbalancedLedgerError extends Error {
 export interface PostingBatchItem {
   accountCode: string;
   entryType: 'DEBIT' | 'CREDIT';
-  amount: number; // positive integer cents
+  amount: number; // positive integer in minor currency units
   currency: Currency;
   description: string;
 }
 
 export class LedgerEngine {
   /**
-   * Commit a balanced set of ledger entries atomically
+   * Commit a balanced set of ledger entries after validating the entire batch.
+   * A transaction ID may be posted only once; reversals use their own ID.
    */
   static postTransaction(transactionId: string, entries: PostingBatchItem[]): LedgerEntry[] {
+    if (!transactionId || transactionId.trim() !== transactionId) {
+      throw new Error('A valid ledger transaction ID is required.');
+    }
     if (!entries || entries.length === 0) {
       throw new Error('Cannot post an empty ledger transaction.');
     }
-
-    // 1. Group by currency to enforce double-entry invariant per currency
-    const amountsByCurrency: Record<string, { debits: number; credits: number }> = {};
-
-    for (const item of entries) {
-      if (item.amount <= 0) {
-        throw new Error(`Invalid non-positive amount: ${item.amount}`);
-      }
-
-      const cur = item.currency;
-      if (!amountsByCurrency[cur]) {
-        amountsByCurrency[cur] = { debits: 0, credits: 0 };
-      }
-
-      if (item.entryType === 'DEBIT') {
-        amountsByCurrency[cur].debits += item.amount;
-      } else {
-        amountsByCurrency[cur].credits += item.amount;
-      }
-
-      // Verify account exists
-      if (!db.ledgerAccounts.has(item.accountCode)) {
-        throw new Error(`Account code '${item.accountCode}' does not exist in chart of accounts.`);
-      }
+    if (db.ledgerEntries.some((entry) => entry.transactionId === transactionId)) {
+      throw new Error(`Ledger transaction '${transactionId}' has already been posted.`);
     }
 
-    // 2. Validate invariant SUM(DEBITS) == SUM(CREDITS) for every currency
-    for (const [cur, totals] of Object.entries(amountsByCurrency)) {
+    const amountsByCurrency: Record<string, { debits: number; credits: number }> = {};
+    const balanceDeltas = new Map<string, number>();
+
+    // Preflight every entry before mutating the ledger or account balances.
+    for (const item of entries) {
+      if (!Number.isSafeInteger(item.amount) || item.amount <= 0) {
+        throw new Error(`Ledger amount must be a positive safe integer: ${item.amount}`);
+      }
+
+      const account = db.ledgerAccounts.get(item.accountCode);
+      if (!account) {
+        throw new Error(`Account code '${item.accountCode}' does not exist in chart of accounts.`);
+      }
+      if (account.currency !== item.currency) {
+        throw new Error(`Currency mismatch for ledger account '${item.accountCode}'.`);
+      }
+
+      const totals = amountsByCurrency[item.currency] ?? { debits: 0, credits: 0 };
+      if (item.entryType === 'DEBIT') totals.debits += item.amount;
+      else totals.credits += item.amount;
+      if (!Number.isSafeInteger(totals.debits) || !Number.isSafeInteger(totals.credits)) {
+        throw new Error('Ledger batch total exceeds the safe integer range.');
+      }
+      amountsByCurrency[item.currency] = totals;
+
+      const increasesWithDebit = account.type === 'ASSET' || account.type === 'EXPENSE';
+      const delta = item.entryType === (increasesWithDebit ? 'DEBIT' : 'CREDIT')
+        ? item.amount
+        : -item.amount;
+      balanceDeltas.set(item.accountCode, (balanceDeltas.get(item.accountCode) ?? 0) + delta);
+    }
+
+    for (const [currency, totals] of Object.entries(amountsByCurrency)) {
       if (totals.debits !== totals.credits) {
         throw new UnbalancedLedgerError(
-          `Double-entry invariant violated for ${cur}: Total Debits (${totals.debits}) != Total Credits (${totals.credits})`,
+          `Double-entry invariant violated for ${currency}: Total Debits (${totals.debits}) != Total Credits (${totals.credits})`,
           totals.debits,
-          totals.credits
+          totals.credits,
         );
       }
     }
 
-    // 3. Atomically write entries and update account balances
-    const timestamp = new Date().toISOString();
-    const createdEntries: LedgerEntry[] = [];
-
-    for (const item of entries) {
-      const entryId = `le_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const entry: LedgerEntry = {
-        id: entryId,
-        transactionId,
-        accountCode: item.accountCode,
-        entryType: item.entryType,
-        amount: item.amount,
-        currency: item.currency,
-        description: item.description,
-        createdAt: timestamp,
-      };
-
-      db.ledgerEntries.push(entry);
-      createdEntries.push(entry);
-
-      // Update account cached balance
-      const account = db.ledgerAccounts.get(item.accountCode)!;
-      if (account.type === 'ASSET' || account.type === 'EXPENSE') {
-        account.balance += item.entryType === 'DEBIT' ? item.amount : -item.amount;
-      } else {
-        // LIABILITY, EQUITY, REVENUE have normal credit balances
-        account.balance += item.entryType === 'CREDIT' ? item.amount : -item.amount;
+    for (const [accountCode, delta] of balanceDeltas) {
+      const account = db.ledgerAccounts.get(accountCode)!;
+      if (!Number.isSafeInteger(account.balance + delta)) {
+        throw new Error(`Ledger account '${accountCode}' balance would exceed the safe integer range.`);
       }
+    }
+
+    const timestamp = new Date().toISOString();
+    const createdEntries: LedgerEntry[] = entries.map((item) => ({
+      id: `le_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      transactionId,
+      accountCode: item.accountCode,
+      entryType: item.entryType,
+      amount: item.amount,
+      currency: item.currency,
+      description: item.description,
+      createdAt: timestamp,
+    }));
+
+    // All validation is complete; apply the append-only batch and its projections.
+    db.ledgerEntries.push(...createdEntries);
+    for (const [accountCode, delta] of balanceDeltas) {
+      db.ledgerAccounts.get(accountCode)!.balance += delta;
     }
 
     return createdEntries;
   }
 
   /**
-   * Reverse a previously posted transaction with balanced inverse entries
+   * Reverse a previously posted transaction with balanced inverse entries.
    */
   static reverseTransaction(originalTransactionId: string, reversalReason: string): LedgerEntry[] {
-    const originalEntries = db.ledgerEntries.filter((e) => e.transactionId === originalTransactionId);
+    const originalEntries = db.ledgerEntries.filter(
+      (entry) => entry.transactionId === originalTransactionId,
+    );
     if (originalEntries.length === 0) {
       throw new Error(`No ledger entries found for transaction '${originalTransactionId}' to reverse.`);
     }
 
-    const inverseBatch: PostingBatchItem[] = originalEntries.map((e) => ({
-      accountCode: e.accountCode,
-      entryType: e.entryType === 'DEBIT' ? 'CREDIT' : 'DEBIT', // Invert
-      amount: e.amount,
-      currency: e.currency,
-      description: `REVERSAL of ${e.id}: ${reversalReason}`,
+    const inverseBatch: PostingBatchItem[] = originalEntries.map((entry) => ({
+      accountCode: entry.accountCode,
+      entryType: entry.entryType === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+      amount: entry.amount,
+      currency: entry.currency,
+      description: `REVERSAL of ${entry.id}: ${reversalReason}`,
     }));
 
     return this.postTransaction(`rev_${originalTransactionId}`, inverseBatch);
   }
 
   /**
-   * Calculate Trial Balance across all accounts
+   * Calculate Trial Balance across all accounts.
    */
   static getTrialBalance(): {
     accounts: { code: string; name: string; currency: Currency; debits: number; credits: number }[];
@@ -132,22 +142,22 @@ export class LedgerEngine {
     let totalDebits = 0;
     let totalCredits = 0;
 
-    const accountSummaries = Array.from(db.ledgerAccounts.values()).map((acc) => {
-      const entries = db.ledgerEntries.filter((e) => e.accountCode === acc.code);
-      const debits = entries
-        .filter((e) => e.entryType === 'DEBIT')
-        .reduce((sum, e) => sum + e.amount, 0);
-      const credits = entries
-        .filter((e) => e.entryType === 'CREDIT')
-        .reduce((sum, e) => sum + e.amount, 0);
+    const accountSummaries = Array.from(db.ledgerAccounts.values()).map((account) => {
+      const accountEntries = db.ledgerEntries.filter((entry) => entry.accountCode === account.code);
+      const debits = accountEntries
+        .filter((entry) => entry.entryType === 'DEBIT')
+        .reduce((sum, entry) => sum + entry.amount, 0);
+      const credits = accountEntries
+        .filter((entry) => entry.entryType === 'CREDIT')
+        .reduce((sum, entry) => sum + entry.amount, 0);
 
       totalDebits += debits;
       totalCredits += credits;
 
       return {
-        code: acc.code,
-        name: acc.name,
-        currency: acc.currency,
+        code: account.code,
+        name: account.name,
+        currency: account.currency,
         debits,
         credits,
       };

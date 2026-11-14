@@ -54,14 +54,14 @@ export class CryptoSimulationService {
     return Array.from(this.liveMarkets.values());
   }
 
-  static getPortfolio(): {
+  static getPortfolio(userId: string): {
     positions: CryptoPosition[];
     totalPortfolioValueUsd: number;
     totalPnlUsd: number;
     overallPnlPercent: number;
     isSimulated: true;
   } {
-    const positions = Array.from(db.cryptoPositions.values());
+    const positions = Array.from(db.cryptoPositions.entries()).filter(([key]) => key.startsWith(userId + ':')).map(([, position]) => position);
     let totalValue = 0;
     let totalPnl = 0;
     let totalCost = 0;
@@ -92,6 +92,7 @@ export class CryptoSimulationService {
    * Execute simulated trade
    */
   static executeSimulatedTrade(
+    userId: string,
     symbol: 'BTC' | 'ETH' | 'USDT',
     side: 'BUY' | 'SELL',
     amountUsd: number
@@ -99,7 +100,8 @@ export class CryptoSimulationService {
     const market = this.liveMarkets.get(symbol);
     if (!market) throw new Error(`Unknown crypto asset ${symbol}`);
 
-    const existing = db.cryptoPositions.get(symbol) || {
+    const positionKey = userId + ':' + symbol;
+    const existing = db.cryptoPositions.get(positionKey) || {
       symbol,
       amount: 0,
       averageBuyPriceUsd: market.priceUsd,
@@ -124,7 +126,7 @@ export class CryptoSimulationService {
     }
 
     existing.currentValueUsd = existing.amount * market.priceUsd;
-    db.cryptoPositions.set(symbol, existing);
+    db.cryptoPositions.set(positionKey, existing);
 
     return existing;
   }

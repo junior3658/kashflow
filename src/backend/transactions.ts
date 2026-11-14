@@ -30,22 +30,63 @@ export class TransactionEngine {
    * Checks idempotency key to prevent duplicate creation.
    */
   static createDraft(params: CreateDraftParams): Transaction {
-    if (params.idempotencyKey && db.idempotencyStore.has(params.idempotencyKey)) {
-      const existingRecord = db.idempotencyStore.get(params.idempotencyKey)!;
+    if (params.idempotencyKey && (params.idempotencyKey.length > 128 || params.idempotencyKey.trim() !== params.idempotencyKey)) {
+      throw new Error('Idempotency key must be 1–128 characters without surrounding whitespace.');
+    }
+    const scopedKey = params.idempotencyKey ? `${params.userId}:${params.idempotencyKey}` : undefined;
+    if (scopedKey && db.idempotencyStore.has(scopedKey)) {
+      const existingRecord = db.idempotencyStore.get(scopedKey)!;
       const tx = db.transactions.get(existingRecord.transactionId);
-      if (tx) {
+      if (tx && tx.userId === params.userId) {
+        // An idempotency key identifies one immutable request, not merely one user.
+        // Reject accidental or malicious reuse with different financial parameters.
+        const sameRequest =
+          tx.type === params.type &&
+          tx.sourceWalletId === params.sourceWalletId &&
+          tx.destinationWalletId === params.destinationWalletId &&
+          tx.amount === params.amount &&
+          tx.currency === params.currency &&
+          tx.provider === params.provider &&
+          tx.orgId === params.orgId &&
+          tx.recipientName === params.recipientName &&
+          tx.recipientAccount === params.recipientAccount;
+        if (!sameRequest) {
+          throw new Error('Idempotency key has already been used with a different transaction payload.');
+        }
         return tx;
       }
     }
 
-    if (params.amount <= 0) {
-      throw new Error('Transaction amount must be strictly positive.');
+    if (!Number.isSafeInteger(params.amount) || params.amount <= 0) {
+      throw new Error('Transaction amount must be a positive safe integer in minor currency units.');
+    }
+    if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
+      throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }
 
     // Verify source wallet exists
     const sourceWallet = db.wallets.get(params.sourceWalletId);
     if (!sourceWallet) {
       throw new Error(`Source wallet '${params.sourceWalletId}' does not exist.`);
+    }
+    if (sourceWallet.ownerId !== params.userId && (!params.orgId || sourceWallet.ownerId !== params.orgId)) {
+      throw new Error('Source wallet does not belong to the authenticated user or authorized organization.');
+    }
+    if (sourceWallet.currency !== params.currency) {
+      throw new Error('Transaction currency must match the source wallet currency.');
+    }
+    if (sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is not active.');
+
+    if (params.destinationWalletId) {
+      const destinationWallet = db.wallets.get(params.destinationWalletId);
+      if (!destinationWallet) throw new Error('Destination wallet does not exist.');
+      if (destinationWallet.id === sourceWallet.id) throw new Error('Source and destination wallets must be different.');
+      if (destinationWallet.currency !== params.currency) throw new Error('Destination wallet currency must match the transaction currency.');
+      if (destinationWallet.status !== 'ACTIVE') throw new Error('Destination wallet is not active.');
+      if (destinationWallet.ownerId !== params.userId &&
+          (!params.orgId || destinationWallet.ownerId !== params.orgId)) {
+        throw new Error('Destination wallet does not belong to the authenticated user or authorized organization.');
+      }
     }
 
     // Calculate indicative processing fee
@@ -84,8 +125,8 @@ export class TransactionEngine {
 
     db.transactions.set(txId, transaction);
 
-    if (params.idempotencyKey) {
-      db.idempotencyStore.set(params.idempotencyKey, {
+    if (scopedKey) {
+      db.idempotencyStore.set(scopedKey, {
         transactionId: txId,
         response: transaction,
         createdAt: Date.now(),
@@ -107,6 +148,9 @@ export class TransactionEngine {
     }
 
     // Reserve funds in wallet
+    const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (sourceWallet.currency !== tx.currency) throw new Error('Source wallet currency mismatch.');
     WalletService.reservePendingDebit(tx.sourceWalletId, tx.amount + tx.fee);
 
     tx.status = 'PENDING';
@@ -123,41 +167,63 @@ export class TransactionEngine {
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
-    if (tx.status !== 'PENDING' && tx.status !== 'CREATED') {
-      throw new Error(`Cannot execute transaction in status '${tx.status}'.`);
+    if (tx.status !== 'PENDING') {
+      throw new Error(`Execution requires a PENDING transaction; current status is '${tx.status}'.`);
+    }
+    if (tx.provider !== 'INTERNAL') {
+      throw new Error('External-provider transactions cannot be settled by the generic execution engine. A verified provider confirmation is required.');
+    }
+    if (tx.currency !== 'USD') {
+      throw new Error('Internal ledger settlement is temporarily limited to USD.');
+    }
+
+    const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    const destinationWallet = tx.destinationWalletId ? db.wallets.get(tx.destinationWalletId) : undefined;
+    const settlementTotal = tx.amount + tx.fee;
+    if (!Number.isSafeInteger(settlementTotal)) throw new Error('Settlement total exceeds the safe integer range.');
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (sourceWallet.currency !== tx.currency || sourceWallet.pendingDebits < settlementTotal ||
+        sourceWallet.internalAccountingBalance < settlementTotal) {
+      throw new Error('Reserved funds or wallet balance are inconsistent; settlement was stopped.');
+    }
+    if (tx.destinationWalletId) {
+      if (!destinationWallet || destinationWallet.status !== 'ACTIVE' ||
+          destinationWallet.currency !== tx.currency || destinationWallet.id === sourceWallet.id ||
+          !Number.isSafeInteger(destinationWallet.internalAccountingBalance + tx.amount)) {
+        throw new Error('Destination wallet is unavailable or cannot accept this settlement.');
+      }
+      if (destinationWallet.ownerId !== tx.userId &&
+          (!tx.orgId || destinationWallet.ownerId !== tx.orgId)) {
+        throw new Error('Destination wallet ownership changed; settlement was stopped.');
+      }
     }
 
     tx.status = 'PROCESSING';
     tx.updatedAt = new Date().toISOString();
 
     try {
-      // 1. Settle balances
-      WalletService.applySettledDebit(tx.sourceWalletId, tx.amount + tx.fee);
-      if (tx.destinationWalletId && db.wallets.has(tx.destinationWalletId)) {
-        WalletService.applySettledCredit(tx.destinationWalletId, tx.amount);
-      }
-
-      // 2. Commit balanced double-entry ledger entries
+      // 1. Post the balanced ledger batch first. All account and balance invariants
+      // are validated before the wallet mutation; no provider is called here.
       LedgerEngine.postTransaction(tx.id, [
         {
-          accountCode: '1010', // User Cash Account
-          entryType: 'CREDIT',
-          amount: tx.amount + tx.fee,
-          currency: tx.currency,
-          description: `Disbursement for ${tx.description}`,
-        },
-        {
-          accountCode: '2010', // Liability Deposit
+          accountCode: '2010', // Customer deposit liability decreases by amount + fee
           entryType: 'DEBIT',
-          amount: tx.amount,
+          amount: settlementTotal,
           currency: tx.currency,
           description: `Settlement: ${tx.description}`,
+        },
+        {
+          accountCode: destinationWallet ? '2010' : '1010', // Internal transfer moves liability; external disbursement reduces cash
+          entryType: 'CREDIT',
+          amount: tx.amount,
+          currency: tx.currency,
+          description: `Disbursement for ${tx.description}`,
         },
         ...(tx.fee > 0
           ? [
               {
-                accountCode: '4010', // Fee Revenue
-                entryType: 'DEBIT',
+                accountCode: '4010', // Platform fee revenue increases
+                entryType: 'CREDIT',
                 amount: tx.fee,
                 currency: tx.currency,
                 description: `Fee: ${tx.description}`,
@@ -165,6 +231,12 @@ export class TransactionEngine {
             ]
           : []),
       ]);
+
+      // 2. Apply the corresponding wallet mutation after the ledger batch succeeds.
+      WalletService.applySettledDebit(tx.sourceWalletId, settlementTotal);
+      if (tx.destinationWalletId && db.wallets.has(tx.destinationWalletId)) {
+        WalletService.applySettledCredit(tx.destinationWalletId, tx.amount);
+      }
 
       tx.status = 'SUCCEEDED';
       if (providerRef) tx.providerReference = providerRef;
@@ -188,8 +260,8 @@ export class TransactionEngine {
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
-    if (tx.status === 'SUCCEEDED') {
-      throw new Error('Cannot cancel an already succeeded transaction. Use refund instead.');
+    if (tx.status !== 'CREATED' && tx.status !== 'PENDING') {
+      throw new Error(`Cannot cancel a transaction with status '${tx.status}'.`);
     }
 
     if (tx.status === 'PENDING') {
@@ -216,8 +288,8 @@ export class TransactionEngine {
     // 1. Ledger reversal
     LedgerEngine.reverseTransaction(tx.id, reason);
 
-    // 2. Refund wallet balance
-    WalletService.applySettledCredit(tx.sourceWalletId, tx.amount);
+    // 2. Restore the full amount originally reserved, including the reversed fee.
+    WalletService.applySettledCredit(tx.sourceWalletId, tx.amount + tx.fee);
 
     tx.status = 'REFUNDED';
     tx.updatedAt = new Date().toISOString();

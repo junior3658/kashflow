@@ -50,7 +50,8 @@ export interface Wallet {
   name: string;
   // Clear distinction of financial balances
   internalAccountingBalance: number; // In cents / base units
-  externalProviderBalance: number;   // Verified from external rails
+  externalProviderBalance: number;   // Provider-reported amount; display only when status is VERIFIED
+  externalProviderBalanceStatus?: 'NOT_SYNCED' | 'VERIFIED' | 'STALE';
   pendingDebits: number;
   pendingCredits: number;
   isSimulated?: boolean;
@@ -196,6 +197,7 @@ export interface AIIntentExtraction {
 
 export interface AIMessage {
   id: string;
+  userId?: string;
   sender: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;

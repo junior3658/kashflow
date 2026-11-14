@@ -26,6 +26,7 @@ export class AIOrchestrator {
     // 1. Persist User Message
     const userMessage: AIMessage = {
       id: userMsgId,
+      userId: params.userId,
       sender: 'user',
       content: params.content,
       timestamp: new Date().toISOString(),
@@ -51,7 +52,7 @@ export class AIOrchestrator {
         orgId: params.orgId,
         userInput: params.content,
         nlpIntent,
-        conversationHistory: db.aiMessages.slice(-10),
+        conversationHistory: db.aiMessages.filter((message) => message.userId === params.userId).slice(-10),
       });
 
       assistantText = result.message;
@@ -65,6 +66,7 @@ export class AIOrchestrator {
     // 4. Persist Assistant Response
     const assistantMessage: AIMessage = {
       id: `msg_a_${Date.now()}`,
+      userId: params.userId,
       sender: 'assistant',
       content: assistantText,
       timestamp: new Date().toISOString(),
@@ -82,11 +84,11 @@ export class AIOrchestrator {
     return assistantMessage;
   }
 
-  static getConversationHistory(): AIMessage[] {
-    return db.aiMessages;
+  static getConversationHistory(userId: string): AIMessage[] {
+    return db.aiMessages.filter((message) => message.userId === userId);
   }
 
-  static clearHistory(): void {
-    db.aiMessages = [];
+  static clearHistory(userId: string): void {
+    db.aiMessages = db.aiMessages.filter((message) => message.userId !== userId);
   }
 }

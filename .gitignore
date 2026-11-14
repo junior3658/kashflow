@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local SQLite authentication database and journals
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal

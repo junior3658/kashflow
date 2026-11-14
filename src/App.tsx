@@ -18,9 +18,14 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { SendMoneyModal } from './components/personal/SendMoneyModal';
 import { ReceiveMoneyModal } from './components/personal/ReceiveMoneyModal';
 import { KashAIChat } from './components/ai/KashAIChat';
-import { Wallet, Transaction } from './backend/types';
+import { Wallet, Transaction, UserRole } from './backend/types';
+import { LandingPage } from './components/landing/LandingPage';
+import { AuthPage } from './components/auth/AuthPage';
 
 export default function App() {
+  const [authStatus, setAuthStatus] = useState<'checking' | 'guest' | 'authenticated'>('checking');
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
+  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>('landing');
   const [portalMode, setPortalMode] = useState<'personal' | 'business' | 'admin'>('personal');
   const [currentTab, setCurrentTab] = useState<NavTab>('personal_dashboard');
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -62,6 +67,26 @@ export default function App() {
     }
   }, [isDark]);
 
+  useEffect(() => {
+    fetch('/api/v1/auth/me', { credentials: 'include' })
+      .then(async (response) => {
+        if (!response.ok) {
+          setCurrentUserRole(null);
+          setAuthStatus('guest');
+          return;
+        }
+        const data = await response.json();
+        setCurrentUserRole(data.user?.role ?? 'PERSONAL_USER');
+        setPortalMode(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business' : 'personal');
+        setCurrentTab(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business_dashboard' : 'personal_dashboard');
+        setAuthStatus('authenticated');
+      })
+      .catch(() => {
+        setCurrentUserRole(null);
+        setAuthStatus('guest');
+      });
+  }, []);
+
   // Fetch Wallets & Transactions
   const refreshData = async () => {
     try {
@@ -84,8 +109,16 @@ export default function App() {
   };
 
   useEffect(() => {
-    refreshData();
-  }, []);
+    if (authStatus === 'authenticated') refreshData();
+  }, [authStatus]);
+
+  if (authStatus === 'checking') {
+    return <div className="grid min-h-screen place-items-center bg-[#061c19] text-emerald-100">KASHFLOW · Loading secure workspace…</div>;
+  }
+  if (authStatus === 'guest') {
+    if (authView === 'landing') return <LandingPage onSignIn={() => setAuthView('login')} onGetStarted={() => setAuthView('register')} />;
+    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={async () => { const response = await fetch('/api/v1/auth/me', { credentials: 'include' }); const data = response.ok ? await response.json() : null; const role = data?.user?.role ?? 'PERSONAL_USER'; const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(role); setCurrentUserRole(role); setPortalMode(isBusiness ? 'business' : 'personal'); setCurrentTab(isBusiness ? 'business_dashboard' : 'personal_dashboard'); setAuthStatus('authenticated'); setAuthView('landing'); }} />;
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 flex flex-col font-sans transition-colors duration-150">
@@ -144,7 +177,6 @@ export default function App() {
         {currentTab === 'personal_exchange' && (
           <CurrencyExchangeView
             wallets={wallets}
-            onExchangeCompleted={refreshData}
           />
         )}
 
@@ -162,11 +194,31 @@ export default function App() {
           />
         )}
 
-        {currentTab === 'business_team' && <TeamManagement />}
+        {currentTab === 'business_team' && (
+          businessWallets.length > 0
+            ? <TeamManagement />
+            : <BusinessDashboard
+                businessWallets={businessWallets}
+                transactions={transactions}
+                onOpenSend={() => setIsSendOpen(true)}
+                onOpenReceive={() => setIsReceiveOpen(true)}
+                onNavigateToTab={setCurrentTab}
+              />
+        )}
 
-        {currentTab === 'business_reconciliation' && <ReconciliationView />}
+        {currentTab === 'business_reconciliation' && (
+          businessWallets.length > 0
+            ? <ReconciliationView />
+            : <BusinessDashboard
+                businessWallets={businessWallets}
+                transactions={transactions}
+                onOpenSend={() => setIsSendOpen(true)}
+                onOpenReceive={() => setIsReceiveOpen(true)}
+                onNavigateToTab={setCurrentTab}
+              />
+        )}
 
-        {currentTab === 'admin_dashboard' && <AdminDashboard />}
+        {currentTab === 'admin_dashboard' && (currentUserRole === 'PLATFORM_ADMIN' ? <AdminDashboard /> : <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 text-sm text-neutral-600 dark:text-neutral-300">Platform administrator access is required for this workspace.</div>)}
 
         {currentTab === 'kash_ai' && (
           <div className="py-2">
@@ -199,7 +251,6 @@ export default function App() {
       <ReceiveMoneyModal
         isOpen={isReceiveOpen}
         onClose={() => setIsReceiveOpen(false)}
-        onPaymentCaptured={refreshData}
       />
 
       {/* Minimalist Black and White Footer */}
@@ -209,11 +260,12 @@ export default function App() {
             <span className="font-bold text-neutral-900 dark:text-neutral-300">KASHFLOW</span>
             <span>·</span>
             <span>Minimalist Financial OS</span>
+            <button onClick={async () => { await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }); setCurrentUserRole(null); setAuthStatus('guest'); setAuthView('landing'); }} className="ml-4 rounded-full border border-neutral-200 dark:border-neutral-800 px-3 py-1.5 font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-900">Sign out</button>
           </div>
           <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span>Ledger: Double-Entry Balanced</span>
+            <span>Ledger: Prototype</span>
             <span>·</span>
-            <span className="text-neutral-900 dark:text-neutral-200 font-semibold">● Verified Operations</span>
+            <span className="text-neutral-900 dark:text-neutral-200 font-semibold">● Provider confirmation required</span>
           </div>
         </div>
       </footer>

@@ -33,7 +33,20 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   onNavigateToTab,
 }) => {
   const primaryWallet = businessWallets[0];
-  const treasuryBalance = primaryWallet ? primaryWallet.internalAccountingBalance / 100 : 84250.0;
+  const treasuryBalance = primaryWallet ? (primaryWallet.internalAccountingBalance - primaryWallet.pendingDebits) / 100 : 0;
+
+  if (!businessWallets.length) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center p-6">
+        <div className="max-w-xl rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8 space-y-3 text-center">
+          <h1 className="text-xl font-extrabold text-neutral-900 dark:text-white">Business workspace not configured</h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            This account has no organization membership or business wallet. Business collections, payouts and reconciliation are unavailable until an organization is provisioned and its permissions are verified.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">

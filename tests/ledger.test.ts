@@ -30,6 +30,51 @@ export async function testLedgerEngine() {
   if (entries.length !== 2) throw new Error('Expected 2 posted ledger entries');
   console.log('✓ Balanced posting test passed.');
 
+  // A ledger transaction ID is append-only and cannot be posted twice.
+  let duplicateRejected = false;
+  try {
+    LedgerEngine.postTransaction('tx_test_bal_01', [
+      { accountCode: '1010', entryType: 'DEBIT', amount: 100, currency: 'USD', description: 'Duplicate' },
+      { accountCode: '2010', entryType: 'CREDIT', amount: 100, currency: 'USD', description: 'Duplicate' },
+    ]);
+  } catch { duplicateRejected = true; }
+  if (!duplicateRejected) throw new Error('Duplicate ledger transaction ID was accepted.');
+  console.log('✓ Duplicate posting rejection passed.');
+
+  // Account currency must match the currency of every posting.
+  let currencyMismatchRejected = false;
+  try {
+    LedgerEngine.postTransaction('tx_test_currency_mismatch', [
+      { accountCode: '1010', entryType: 'DEBIT', amount: 100, currency: 'EUR', description: 'Wrong currency' },
+      { accountCode: '2010', entryType: 'CREDIT', amount: 100, currency: 'EUR', description: 'Wrong currency' },
+    ]);
+  } catch { currencyMismatchRejected = true; }
+  if (!currencyMismatchRejected) throw new Error('Cross-currency ledger account posting was accepted.');
+  console.log('✓ Ledger account currency validation passed.');
+
+  let fractionalAmountRejected = false;
+  try {
+    LedgerEngine.postTransaction('tx_test_fractional_amount', [
+      { accountCode: '1010', entryType: 'DEBIT', amount: 1.5, currency: 'USD', description: 'Fractional' },
+      { accountCode: '2010', entryType: 'CREDIT', amount: 1.5, currency: 'USD', description: 'Fractional' },
+    ]);
+  } catch { fractionalAmountRejected = true; }
+  if (!fractionalAmountRejected) throw new Error('Fractional minor-unit ledger amount was accepted.');
+  console.log('✓ Integer minor-unit validation passed.');
+
+  // A transfer fee reduces customer liability, decreases cash by the sent amount,
+  // and increases platform fee revenue.
+  const feeRevenueBefore = db.ledgerAccounts.get('4010')!.balance;
+  const feeEntries = LedgerEngine.postTransaction('tx_test_fee_direction', [
+    { accountCode: '2010', entryType: 'DEBIT', amount: 1030, currency: 'USD', description: 'Customer liability settlement' },
+    { accountCode: '1010', entryType: 'CREDIT', amount: 1000, currency: 'USD', description: 'Cash disbursement' },
+    { accountCode: '4010', entryType: 'CREDIT', amount: 30, currency: 'USD', description: 'Platform fee revenue' },
+  ]);
+  if (feeEntries[2].entryType !== 'CREDIT' || db.ledgerAccounts.get('4010')!.balance !== feeRevenueBefore + 30) {
+    throw new Error('Platform fee revenue was not posted with its normal credit balance.');
+  }
+  console.log('✓ Fee revenue accounting direction passed.');
+
   // Test 2: Invariant enforcement on unbalanced entry
   let threw = false;
   try {

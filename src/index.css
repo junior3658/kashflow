@@ -33,3 +33,30 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
 }
+
+
+/* Rotating payment cube on the public KASHFLOW landing page. */
+.payment-cube-stage { perspective: 1100px; perspective-origin: 50% 45%; }
+.payment-cube { position: relative; width: 224px; height: 224px; transform-style: preserve-3d; animation: kashflow-cube-spin 19s linear infinite; }
+.cube-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; overflow: hidden; border: 1px solid rgba(190,205,255,.42); border-radius: 24px; color: #f8faff; background: linear-gradient(145deg,rgba(43,59,111,.94),rgba(13,20,48,.96)); box-shadow: inset 0 0 35px rgba(151,169,255,.12), 0 15px 45px rgba(0,0,0,.24); backface-visibility: hidden; }
+.cube-face::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(135deg,rgba(255,255,255,.13),transparent 48%,rgba(122,147,255,.08)); }
+.cube-front { transform: rotateY(0deg) translateZ(112px); }
+.cube-right { transform: rotateY(90deg) translateZ(112px); }
+.cube-back { transform: rotateY(180deg) translateZ(112px); }
+.cube-left { transform: rotateY(-90deg) translateZ(112px); }
+.cube-top { transform: rotateX(90deg) translateZ(112px); }
+.cube-bottom { transform: rotateX(-90deg) translateZ(112px); }
+.cube-kicker { font-size: 9px; font-weight: 700; letter-spacing: .24em; color: #c5d0ff; }
+.cube-caption { font-size: 10px; color: rgba(235,240,255,.62); letter-spacing: .04em; }
+.paypal-mark { font-size: 66px; line-height: .9; font-weight: 900; font-style: italic; color: #8ab4ff; text-shadow: 5px 4px 0 #1d4fa5; }
+.mastercard-mark { display: flex; align-items: center; justify-content: center; }
+.mastercard-mark i { display: block; width: 58px; height: 58px; border-radius: 50%; background: #eb3342; }
+.mastercard-mark i+i { margin-left: -23px; background: #f5a623; mix-blend-mode: screen; }
+.mobile-money-mark { position: relative; display: grid; place-items: center; color: #a5f3fc; }
+.mobile-signal { position: absolute; top: 18px; font-size: 13px; letter-spacing: 2px; color: #a5f3fc; }
+.cube-glow { position: absolute; width: 260px; height: 260px; border-radius: 50%; background: radial-gradient(circle,rgba(111,132,255,.28),rgba(64,91,201,.08) 48%,transparent 72%); filter: blur(10px); }
+.cube-orbit { position: absolute; width: 340px; height: 125px; border: 1px solid rgba(168,185,255,.16); border-radius: 50%; transform: rotate(-25deg); pointer-events: none; }
+.cube-orbit-two { width: 390px; height: 160px; transform: rotate(35deg); border-style: dashed; opacity: .65; }
+@keyframes kashflow-cube-spin { 0% { transform: rotateX(-17deg) rotateY(0deg); } 100% { transform: rotateX(343deg) rotateY(360deg); } }
+@media (prefers-reduced-motion: reduce) { .payment-cube { animation: none; transform: rotateX(-17deg) rotateY(-24deg); } }
+@media (max-width: 480px) { .payment-cube { width: 190px; height: 190px; } .cube-front { transform: rotateY(0deg) translateZ(95px); } .cube-right { transform: rotateY(90deg) translateZ(95px); } .cube-back { transform: rotateY(180deg) translateZ(95px); } .cube-left { transform: rotateY(-90deg) translateZ(95px); } .cube-top { transform: rotateX(90deg) translateZ(95px); } .cube-bottom { transform: rotateX(-90deg) translateZ(95px); } .cube-face { border-radius: 19px; gap: 9px; } }
