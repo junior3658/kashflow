@@ -180,9 +180,29 @@ export default function App() {
           />
         )}
 
-        {currentTab === 'business_team' && <TeamManagement />}
+        {currentTab === 'business_team' && (
+          businessWallets.length > 0
+            ? <TeamManagement />
+            : <BusinessDashboard
+                businessWallets={businessWallets}
+                transactions={transactions}
+                onOpenSend={() => setIsSendOpen(true)}
+                onOpenReceive={() => setIsReceiveOpen(true)}
+                onNavigateToTab={setCurrentTab}
+              />
+        )}
 
-        {currentTab === 'business_reconciliation' && <ReconciliationView />}
+        {currentTab === 'business_reconciliation' && (
+          businessWallets.length > 0
+            ? <ReconciliationView />
+            : <BusinessDashboard
+                businessWallets={businessWallets}
+                transactions={transactions}
+                onOpenSend={() => setIsSendOpen(true)}
+                onOpenReceive={() => setIsReceiveOpen(true)}
+                onNavigateToTab={setCurrentTab}
+              />
+        )}
 
         {currentTab === 'admin_dashboard' && <AdminDashboard />}
 
