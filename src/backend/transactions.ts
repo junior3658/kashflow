@@ -47,8 +47,10 @@ export class TransactionEngine {
           tx.amount === params.amount &&
           tx.currency === params.currency &&
           tx.provider === params.provider &&
+          tx.orgId === params.orgId &&
           tx.recipientName === params.recipientName &&
-          tx.recipientAccount === params.recipientAccount;
+          tx.recipientAccount === params.recipientAccount &&
+          tx.description === params.description;
         if (!sameRequest) {
           throw new Error('Idempotency key has already been used with a different transaction payload.');
         }
@@ -75,6 +77,18 @@ export class TransactionEngine {
       throw new Error('Transaction currency must match the source wallet currency.');
     }
     if (sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is not active.');
+
+    if (params.destinationWalletId) {
+      const destinationWallet = db.wallets.get(params.destinationWalletId);
+      if (!destinationWallet) throw new Error('Destination wallet does not exist.');
+      if (destinationWallet.id === sourceWallet.id) throw new Error('Source and destination wallets must be different.');
+      if (destinationWallet.currency !== params.currency) throw new Error('Destination wallet currency must match the transaction currency.');
+      if (destinationWallet.status !== 'ACTIVE') throw new Error('Destination wallet is not active.');
+      if (destinationWallet.ownerId !== params.userId &&
+          (!params.orgId || destinationWallet.ownerId !== params.orgId)) {
+        throw new Error('Destination wallet does not belong to the authenticated user or authorized organization.');
+      }
+    }
 
     // Calculate indicative processing fee
     let fee = 0;
@@ -165,11 +179,24 @@ export class TransactionEngine {
     }
 
     const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    const destinationWallet = tx.destinationWalletId ? db.wallets.get(tx.destinationWalletId) : undefined;
     const settlementTotal = tx.amount + tx.fee;
+    if (!Number.isSafeInteger(settlementTotal)) throw new Error('Settlement total exceeds the safe integer range.');
     if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
     if (sourceWallet.currency !== tx.currency || sourceWallet.pendingDebits < settlementTotal ||
         sourceWallet.internalAccountingBalance < settlementTotal) {
       throw new Error('Reserved funds or wallet balance are inconsistent; settlement was stopped.');
+    }
+    if (tx.destinationWalletId) {
+      if (!destinationWallet || destinationWallet.status !== 'ACTIVE' ||
+          destinationWallet.currency !== tx.currency || destinationWallet.id === sourceWallet.id ||
+          !Number.isSafeInteger(destinationWallet.internalAccountingBalance + tx.amount)) {
+        throw new Error('Destination wallet is unavailable or cannot accept this settlement.');
+      }
+      if (destinationWallet.ownerId !== tx.userId &&
+          (!tx.orgId || destinationWallet.ownerId !== tx.orgId)) {
+        throw new Error('Destination wallet ownership changed; settlement was stopped.');
+      }
     }
 
     tx.status = 'PROCESSING';
@@ -187,7 +214,7 @@ export class TransactionEngine {
           description: `Settlement: ${tx.description}`,
         },
         {
-          accountCode: '1010', // Cash asset decreases by the amount sent
+          accountCode: destinationWallet ? '2010' : '1010', // Internal transfer moves liability; external disbursement reduces cash
           entryType: 'CREDIT',
           amount: tx.amount,
           currency: tx.currency,
