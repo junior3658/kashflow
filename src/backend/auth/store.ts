@@ -24,7 +24,9 @@ CREATE TABLE IF NOT EXISTS auth_users(
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
   verified_at TEXT,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  account_type TEXT NOT NULL DEFAULT 'PERSONAL',
+  business_name TEXT
 );
 CREATE TABLE IF NOT EXISTS verification_codes(
   id TEXT PRIMARY KEY,
@@ -44,6 +46,10 @@ CREATE TABLE IF NOT EXISTS auth_sessions(
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON auth_sessions(expires_at);
 `);
+// Safe additive migration for databases created before account-type selection.
+const authColumns = new Set((sql.pragma('table_info(auth_users)') as Array<{ name: string }>).map((column) => column.name));
+if (!authColumns.has('account_type')) sql.exec("ALTER TABLE auth_users ADD COLUMN account_type TEXT NOT NULL DEFAULT 'PERSONAL'");
+if (!authColumns.has('business_name')) sql.exec('ALTER TABLE auth_users ADD COLUMN business_name TEXT');
 
 const emailNorm = (value: string) => value.trim().toLowerCase();
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -93,11 +99,14 @@ export function revokeSession(token?: string) {
 }
 
 function addRuntimeUser(user: any) {
+  const isBusiness = user.account_type === 'BUSINESS';
+  const orgId = isBusiness ? `org_${user.id}` : undefined;
   db.users.set(user.id, {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
-    role: 'PERSONAL_USER',
+    role: isBusiness ? 'BUSINESS_OWNER' : 'PERSONAL_USER',
+    ...(orgId ? { currentOrgId: orgId } : {}),
     createdAt: user.created_at,
   });
 
@@ -105,26 +114,47 @@ function addRuntimeUser(user: any) {
     const id = `wlt_${user.id}_${currency.toLowerCase()}`;
     if (!db.wallets.has(id)) {
       db.wallets.set(id, {
-        id,
-        ownerId: user.id,
-        type: 'PERSONAL',
-        currency,
+        id, ownerId: user.id, type: 'PERSONAL', currency,
         name: `Primary ${currency} Wallet`,
-        internalAccountingBalance: 0,
-        externalProviderBalance: 0,
-        externalProviderBalanceStatus: 'NOT_SYNCED',
-        pendingDebits: 0,
-        pendingCredits: 0,
+        internalAccountingBalance: 0, externalProviderBalance: 0,
+        externalProviderBalanceStatus: 'NOT_SYNCED', pendingDebits: 0,
+        pendingCredits: 0, status: 'ACTIVE',
+        createdAt: user.created_at, updatedAt: user.created_at,
+      });
+    }
+  }
+
+  if (isBusiness && orgId) {
+    if (!db.organizations.has(orgId)) {
+      db.organizations.set(orgId, {
+        id: orgId,
+        name: user.business_name || `${user.full_name}'s business`,
+        ownerUserId: user.id,
+        currency: 'USD',
         status: 'ACTIVE',
         createdAt: user.created_at,
-        updatedAt: user.created_at,
+      });
+    }
+    const membershipId = `mem_${user.id}`;
+    if (!db.memberships.has(membershipId)) {
+      db.memberships.set(membershipId, { id: membershipId, orgId, userId: user.id, role: 'OWNER', permissions: ['ALL'] });
+    }
+    const businessWalletId = `wlt_${orgId}_usd`;
+    if (!db.wallets.has(businessWalletId)) {
+      db.wallets.set(businessWalletId, {
+        id: businessWalletId, ownerId: orgId, type: 'BUSINESS', currency: 'USD',
+        name: `${user.business_name || 'Business'} Treasury`,
+        internalAccountingBalance: 0, externalProviderBalance: 0,
+        externalProviderBalanceStatus: 'NOT_SYNCED', pendingDebits: 0,
+        pendingCredits: 0, status: 'ACTIVE',
+        createdAt: user.created_at, updatedAt: user.created_at,
       });
     }
   }
 }
 
 for (const user of sql.prepare(
-  'SELECT id, email, full_name, created_at FROM auth_users WHERE verified_at IS NOT NULL'
+  'SELECT id, email, full_name, created_at, account_type, business_name FROM auth_users WHERE verified_at IS NOT NULL'
 ).all() as any[]) {
   addRuntimeUser(user);
 }
@@ -155,10 +185,13 @@ async function sendCode(user: any) {
   });
 }
 
-export async function registerAccount(value: { fullName: string; email: string; password: string }) {
+export async function registerAccount(value: { fullName: string; email: string; password: string; accountType?: 'PERSONAL' | 'BUSINESS'; businessName?: string }) {
   const name = value.fullName.trim();
   const email = emailNorm(value.email);
+  const accountType = value.accountType === 'BUSINESS' ? 'BUSINESS' : 'PERSONAL';
+  const businessName = typeof value.businessName === 'string' ? value.businessName.trim() : '';
 
+  if (accountType === 'BUSINESS' && (businessName.length < 2 || businessName.length > 120)) throw new Error('Enter a valid business name.');
   if (name.length < 2 || name.length > 100) throw new Error('Enter a valid full name.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     throw new Error('Enter a valid email address.');
@@ -177,8 +210,8 @@ export async function registerAccount(value: { fullName: string; email: string; 
 
   try {
     sql.prepare(
-      'INSERT INTO auth_users(id, email, full_name, password_hash, password_salt, created_at) VALUES(?,?,?,?,?,?)'
-    ).run(id, email, name, hash, salt, createdAt);
+      'INSERT INTO auth_users(id, email, full_name, password_hash, password_salt, created_at, account_type, business_name) VALUES(?,?,?,?,?,?,?,?)'
+    ).run(id, email, name, hash, salt, createdAt, accountType, accountType === 'BUSINESS' ? businessName : null);
   } catch (error: any) {
     if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
       throw new Error('Unable to create this account. Check the email or sign in.');
@@ -199,7 +232,7 @@ export async function verifyEmail(emailInput: string, code: string) {
   if (!/^\d{6}$/.test(code)) throw new Error('Invalid or expired verification code.');
 
   const user = sql.prepare(
-    'SELECT id, email, full_name, created_at, verified_at FROM auth_users WHERE email = ?'
+    'SELECT id, email, full_name, created_at, verified_at, account_type, business_name FROM auth_users WHERE email = ?'
   ).get(email) as any;
 
   if (!user || user.verified_at) throw new Error('Invalid or expired verification code.');
@@ -289,14 +322,16 @@ export async function loginAccount(emailInput: string, password: string) {
 
 export function publicUser(id: string) {
   const user = sql.prepare(
-    'SELECT id, email, full_name, created_at FROM auth_users WHERE id = ? AND verified_at IS NOT NULL'
+    'SELECT id, email, full_name, created_at, account_type, business_name FROM auth_users WHERE id = ? AND verified_at IS NOT NULL'
   ).get(id) as any;
 
   return user ? {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
-    role: 'PERSONAL_USER',
+    role: user.account_type === 'BUSINESS' ? 'BUSINESS_OWNER' : 'PERSONAL_USER',
+    accountType: user.account_type || 'PERSONAL',
+    ...(user.account_type === 'BUSINESS' ? { businessName: user.business_name, organizationId: `org_${user.id}` } : {}),
     createdAt: user.created_at,
   } : null;
 }
