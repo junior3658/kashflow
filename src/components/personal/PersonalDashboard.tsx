@@ -48,13 +48,6 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
   const usdWallet = wallets.find((w) => w.currency === 'USD') || wallets[0];
   const totalBalanceUsd = usdWallet ? usdWallet.internalAccountingBalance / 100 : 0;
 
-  const quickContacts = [
-    { name: 'Patrick M.', handle: '@patrick', phone: '+243 81 999 1234', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80' },
-    { name: 'Owen F.', handle: '@owen', phone: '+243 82 444 8888', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80' },
-    { name: 'Lydia K.', handle: '@lydia', phone: '+243 89 111 2222', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80' },
-    { name: 'Amelia T.', handle: '@amelia', phone: '+243 99 777 6655', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=120&q=80' },
-  ];
-
   return (
     <div className="space-y-6 pb-12">
       {/* Top Greeting & Date Header */}
@@ -229,11 +222,11 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-black tracking-wider text-white">KASHFLOW</span>
-                  <span className="text-[10px] font-semibold tracking-wider text-blue-100 uppercase">DEBIT</span>
+                  <span className="text-[10px] font-semibold tracking-wider text-blue-100 uppercase">CARD PREVIEW</span>
                 </div>
                 <div className="inline-flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-300/40 px-2 py-0.5 rounded text-[10px] text-emerald-200 font-semibold backdrop-blur-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Active
+                  <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
+                  Not issued
                 </div>
               </div>
 
@@ -262,12 +255,12 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             {/* Bottom Row: Cardholder, Number, and Official Red & Yellow-Orange Mastercard Logo */}
             <div className="flex items-end justify-between relative z-10 pt-1 text-xs">
               <div>
-                <div className="text-[10px] text-blue-100/80 uppercase font-medium">Card Holder</div>
-                <div className="font-bold tracking-wide text-white text-sm">Junior Ngwej</div>
+                <div className="text-[10px] text-blue-100/80 uppercase font-medium">Card status</div>
+                <div className="font-bold tracking-wide text-white text-sm">Preview only</div>
               </div>
 
               <div className="font-mono tracking-widest text-sm text-blue-50 font-bold">
-                •••• 9965
+                No card number
               </div>
 
               {/* Official Mastercard Interlocking Red & Yellow/Orange Circles Logo */}
@@ -280,37 +273,21 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             </div>
           </div>
 
-          {/* Quick Transfer Avatars Row (Clean Monochrome Surface with blue hover) */}
+          {/* Saved recipient state */}
           <div className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 shadow-xs">
-            <div className="flex items-center justify-between text-xs mb-3">
-              <span className="text-neutral-900 dark:text-white font-bold">Quick Transfer</span>
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-neutral-900 dark:text-white font-bold">Saved recipients</span>
               <button
                 onClick={onOpenSend}
                 className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
-                <span>New</span>
+                <span>New transfer</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
-
-            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1">
-              {quickContacts.map((contact) => (
-                <button
-                  key={contact.name}
-                  onClick={onOpenSend}
-                  className="flex flex-col items-center gap-1 group text-center cursor-pointer"
-                >
-                  <img
-                    src={contact.avatar}
-                    alt={contact.name}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-neutral-200 dark:border-neutral-700 group-hover:border-blue-600 transition-colors"
-                  />
-                  <span className="text-[11px] text-neutral-600 dark:text-neutral-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate max-w-[60px] font-medium">
-                    {contact.name.split(' ')[0]}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              No contacts are linked yet. Enter and verify recipient details when preparing a transfer.
+            </p>
           </div>
 
           {/* AI Advisor Insight Card with Touch of Blue */}
@@ -320,11 +297,10 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             </div>
             <div className="space-y-1">
               <div className="text-xs font-bold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                KASH AI Insight
-                <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Live</span>
+                KASH AI · Advisory
               </div>
               <p className="text-xs text-neutral-600 dark:text-neutral-300 leading-relaxed">
-                Your monthly spend is currently 64% of budget. Recurring subscription charges are nominal.
+                No verified spending insights are available until persistent transaction history and provider reconciliation are connected.
               </p>
               <button
                 onClick={onOpenAI}
