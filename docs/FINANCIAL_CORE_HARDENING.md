@@ -19,6 +19,8 @@
 - Malformed percent-encoded session cookies are rejected safely.
 - Email verification code consumption and account verification now occur in one SQLite transaction, preventing two concurrent requests from consuming the same code; failed-attempt increments are conditional and concurrency-safe.
 - Ledger posting validates positive safe-integer minor units, account/currency consistency, safe aggregate/account balances, and duplicate transaction IDs before appending a batch.
+- Wallet reservation/debit/credit methods reject fractional or unsafe minor units, frozen-wallet debits, missing reservations, over-release and balance overflow.
+- Optional destination wallets are validated for existence, active state, matching currency and user/organization ownership before settlement; their credit capacity is preflighted before the ledger batch.
 - Transfer fee postings now reduce customer deposit liability, reduce cash by the sent amount, and credit platform fee revenue using normal accounting directions.
 - Cancellation is restricted to CREATED/PENDING; refund reversals restore the full originally reserved amount, including the reversed fee.
 - Currency exchange settlement is disabled because the former endpoint changed wallet balances and marked transactions SUCCEEDED without a balanced ledger batch or atomic reservation.
