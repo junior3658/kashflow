@@ -49,7 +49,8 @@ const emailNorm = (value: string) => value.trim().toLowerCase();
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 
 async function passwordHash(password: string, salt: string) {
-  return (await scrypt(password, salt, 64)).toString('hex');
+  const derivedKey = await scrypt(password, salt, 64) as Buffer;
+  return derivedKey.toString('hex');
 }
 
 function session(userId: string) {
