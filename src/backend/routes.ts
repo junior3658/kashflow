@@ -115,7 +115,7 @@ apiRouter.get('/wallets', (req: Request, res: Response) => {
     consolidatedNetWorthUsd: consolidated.totalUsd,
     consolidatedNetWorthBasis: 'ESTIMATED_FROM_INTERNAL_LEDGER',
     isConsolidatedNetWorthEstimated: true,
-    providerBalancesVerified: wallets.every((wallet) => wallet.externalProviderBalanceStatus === 'VERIFIED'),
+    providerBalancesVerified: wallets.length > 0 && wallets.every((wallet) => wallet.externalProviderBalanceStatus === 'VERIFIED'),
   });
 });
 
