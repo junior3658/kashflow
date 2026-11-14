@@ -110,7 +110,13 @@ apiRouter.get('/wallets', (req: Request, res: Response) => {
   const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
   const wallets = WalletService.getWalletsByOwner(ownerId, type);
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);
-  res.json({ wallets, consolidatedNetWorthUsd: consolidated.totalUsd });
+  res.json({
+    wallets,
+    consolidatedNetWorthUsd: consolidated.totalUsd,
+    consolidatedNetWorthBasis: 'ESTIMATED_FROM_INTERNAL_LEDGER',
+    isConsolidatedNetWorthEstimated: true,
+    providerBalancesVerified: wallets.every((wallet) => wallet.externalProviderBalanceStatus === 'VERIFIED'),
+  });
 });
 
 // -------------------------------------------------------------
