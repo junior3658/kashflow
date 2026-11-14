@@ -29,7 +29,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
   if (!isOpen) return null;
 
   const currentWallet = wallets.find((w) => w.currency === currency) || wallets[0];
-  const availableBalance = currentWallet ? currentWallet.internalAccountingBalance / 100 : 0;
+  const availableBalance = currentWallet ? (currentWallet.internalAccountingBalance - currentWallet.pendingDebits) / 100 : 0;
   const numAmount = parseFloat(amountStr) || 0;
 
   const handleNumpadKey = (key: string) => {
