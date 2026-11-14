@@ -25,6 +25,7 @@
 - Cancellation is restricted to CREATED/PENDING; refund reversals restore the full originally reserved amount, including the reversed fee.
 - Currency exchange settlement is disabled because the former endpoint changed wallet balances and marked transactions SUCCEEDED without a balanced ledger batch or atomic reservation.
 - Transaction safety regression tests now cover successful pending settlement, cross-tenant wallet rejection, external-provider settlement rejection, insufficient-funds reservation rejection, idempotency payload conflicts, and separation of internal/provider balances.
+- Authentication concurrency tests now cover one-time verification-code consumption and the five-attempt ceiling under concurrent invalid requests.
 
 ## Important limitations
 
