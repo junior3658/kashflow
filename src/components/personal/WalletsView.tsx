@@ -30,8 +30,9 @@ export const WalletsView: React.FC<WalletsViewProps> = ({
         <div className="space-y-1">
           <span className="font-bold text-neutral-900 dark:text-white">Financial Balance Governance</span>
           <p className="leading-relaxed">
-            In KASHFLOW, logical wallets reflect settled double-entry ledger positions. External provider balances
-            are confirmed directly via API handshakes. In-flight transactions are held in pending debits until provider settlement.
+            Internal balances are prototype ledger projections. Provider balances remain unsynchronized until an
+            authoritative provider reconciliation is implemented. An accepted collection request is not a confirmed payment,
+            and pending reservations reduce the amount available for internal transfers.
           </p>
         </div>
       </div>
@@ -41,6 +42,7 @@ export const WalletsView: React.FC<WalletsViewProps> = ({
         {wallets.map((wallet) => {
           const available = (wallet.internalAccountingBalance - wallet.pendingDebits) / 100;
           const verified = wallet.externalProviderBalance / 100;
+          const providerStatus = wallet.externalProviderBalanceStatus ?? 'NOT_SYNCED';
           const pending = wallet.pendingDebits / 100;
 
           return (
@@ -73,9 +75,13 @@ export const WalletsView: React.FC<WalletsViewProps> = ({
               {/* Balance Breakdown Matrix */}
               <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-neutral-500 dark:text-neutral-400">External Rail Verified:</span>
+                  <span className="text-neutral-500 dark:text-neutral-400">Provider Balance:</span>
                   <span className="font-mono text-neutral-900 dark:text-white font-semibold tabular-nums">
-                    {verified.toLocaleString('en-US', { minimumFractionDigits: 2 })} {wallet.currency}
+                    {providerStatus === 'VERIFIED'
+                      ? `${verified.toLocaleString('en-US', { minimumFractionDigits: 2 })} ${wallet.currency}`
+                      : providerStatus === 'STALE'
+                        ? 'Stale · reconciliation required'
+                        : 'Not synchronized'}
                   </span>
                 </div>
                 <div className="flex justify-between">
