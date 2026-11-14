@@ -76,7 +76,7 @@ export const ReceiveMoneyModal: React.FC<ReceiveMoneyModalProps> = ({
               activeTab === 'shwary' ? 'bg-white text-neutral-950 shadow-xs dark:bg-neutral-800 dark:text-white' : 'text-neutral-600 hover:text-neutral-950 dark:text-neutral-400'
             }`}
           >
-            Shwary USSD
+            Shwary Mobile Money
           </button>
           <button
             onClick={() => setActiveTab('qr')}
