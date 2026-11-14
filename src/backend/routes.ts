@@ -370,8 +370,8 @@ apiRouter.get('/admin/health', (req: Request, res: Response) => {
   const aiTelemetry = LLMProvider.getTelemetry();
 
   res.json({
-    status: 'HEALTHY',
-    version: '1.0.0-production',
+    status: 'PROTOTYPE',
+    version: '0.0.0-prototype',
     timestamp: new Date().toISOString(),
     ledger: {
       isBalanced: trialBalance.isBalanced,
@@ -379,9 +379,9 @@ apiRouter.get('/admin/health', (req: Request, res: Response) => {
       totalCreditsUsd: trialBalance.totalCredits / 100,
     },
     providers: {
-      paypal: { status: 'ONLINE', mode: 'SANDBOX' },
+      paypal: { status: 'DISABLED', mode: 'NOT_CONNECTED' },
       shwary: { status: shwaryAdapter.isConfigured() ? 'CONFIGURED' : 'NOT_CONFIGURED', mode: shwaryAdapter.getCapabilities().encashment.mode, boundary: 'SETTLEMENT_VERIFICATION_REQUIRED' },
-      exchangeDesk: { status: 'ONLINE' },
+      exchangeDesk: { status: 'QUOTES_ONLY', settlement: 'DISABLED_PENDING_LEDGER_WORKFLOW' },
       cryptoSimulation: { status: 'ONLINE', mode: 'SIMULATED' },
     },
     aiTelemetry,
