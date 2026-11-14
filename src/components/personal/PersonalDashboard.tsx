@@ -60,7 +60,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             Good afternoon, Junior.
           </h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Here is your verified financial overview across banking, mobile money, and FX rails.
+            Here is your KASHFLOW prototype overview. External provider balances and settlements are not yet synchronized.
           </p>
         </div>
 
@@ -98,22 +98,6 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 </span>
               </div>
 
-              {/* Timeframe selector */}
-              <div className="flex items-center p-0.5 bg-neutral-100 dark:bg-neutral-950 rounded-lg border border-neutral-200 dark:border-neutral-800 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-                {(['1m', '3m', '6m', '1y'] as const).map((range) => (
-                  <button
-                    key={range}
-                    onClick={() => setSelectedChartRange(range)}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      selectedChartRange === range
-                        ? 'bg-white text-neutral-950 shadow-xs font-bold dark:bg-neutral-800 dark:text-white'
-                        : 'hover:text-neutral-950 dark:hover:text-white'
-                    }`}
-                  >
-                    {range}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Balance Numerical Display */}
@@ -176,7 +160,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
               <div className="mt-3">
                 <div className="flex justify-between text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
                   <span>Budget usage</span>
-                  <span className="font-mono font-bold text-neutral-900 dark:text-white">64%</span>
+                  <span className="font-mono font-bold text-neutral-900 dark:text-white">Not configured</span>
                 </div>
                 <div className="h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                   <div className="h-full bg-neutral-300 dark:bg-neutral-700 rounded-full" style={{ width: '0%' }} />
@@ -316,54 +300,12 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
 
       {/* Secondary Row: Spending Categories + Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Categories Bar Breakdown (4 cols) */}
-        <div className="lg:col-span-4 bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Monthly Categories</h3>
-            <span className="text-xs font-mono tabular-nums text-neutral-500 dark:text-neutral-400">$3,240 Total</span>
-          </div>
-
-          {/* Color bar with touch of blue */}
-          <div className="h-2 w-full rounded-full bg-neutral-100 dark:bg-neutral-800 flex overflow-hidden">
-            <div className="w-[45%] bg-blue-600" title="Utility payments" />
-            <div className="w-[30%] bg-neutral-800 dark:bg-neutral-300" title="Groceries" />
-            <div className="w-[15%] bg-neutral-500 dark:bg-neutral-500" title="Beauty and health" />
-            <div className="w-[10%] bg-neutral-300 dark:bg-neutral-700" title="Others" />
-          </div>
-
-          <div className="space-y-3 pt-2 text-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                <span className="text-neutral-700 dark:text-neutral-300">Utility payments</span>
-              </div>
-              <span className="font-mono text-neutral-900 dark:text-white tabular-nums font-semibold">$1,200.00</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-neutral-800 dark:bg-neutral-300" />
-                <span className="text-neutral-700 dark:text-neutral-300">Groceries</span>
-              </div>
-              <span className="font-mono text-neutral-900 dark:text-white tabular-nums font-semibold">$845.00</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-neutral-500" />
-                <span className="text-neutral-700 dark:text-neutral-300">Beauty & health</span>
-              </div>
-              <span className="font-mono text-neutral-900 dark:text-white tabular-nums font-semibold">$400.00</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-neutral-300 dark:bg-neutral-700" />
-                <span className="text-neutral-700 dark:text-neutral-300">Software & cloud</span>
-              </div>
-              <span className="font-mono text-neutral-900 dark:text-white tabular-nums font-semibold">$180.00</span>
-            </div>
-          </div>
+        {/* Spending analytics placeholder */}
+        <div className="lg:col-span-4 bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 shadow-xs space-y-2">
+          <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Spending categories</h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Unavailable until transaction history is stored persistently and categorized. No sample spending figures are shown as real activity.
+          </p>
         </div>
 
         {/* Recent Transactions Table / List (8 cols) */}
@@ -371,7 +313,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Recent Transactions</h3>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">Activity synchronized across mobile money & PayPal rails</p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">Internal prototype activity. Provider settlement is not verified.</p>
             </div>
             <button
               onClick={() => onNavigateToTab('personal_transactions')}
