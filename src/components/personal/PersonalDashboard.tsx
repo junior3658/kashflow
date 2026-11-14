@@ -43,21 +43,10 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
   isDark = false,
 }) => {
   const [hideBalances, setHideBalances] = useState(false);
-  const [selectedChartRange, setSelectedChartRange] = useState<'1m' | '3m' | '6m' | '1y'>('6m');
 
   // Primary USD Wallet
   const usdWallet = wallets.find((w) => w.currency === 'USD') || wallets[0];
-  const totalBalanceUsd = usdWallet ? usdWallet.internalAccountingBalance / 100 : 12840.5;
-
-  const chartPoints = [
-    { month: 'May', val: 4200 },
-    { month: 'Jun', val: 6800 },
-    { month: 'Jul', val: 5900 },
-    { month: 'Aug', val: 8780 },
-    { month: 'Sep', val: 7200 },
-    { month: 'Oct', val: 10400 },
-    { month: 'Nov', val: 12840.5 },
-  ];
+  const totalBalanceUsd = usdWallet ? usdWallet.internalAccountingBalance / 100 : 0;
 
   const quickContacts = [
     { name: 'Patrick M.', handle: '@patrick', phone: '+243 81 999 1234', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&q=80' },
@@ -112,7 +101,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                   Total Available Balance
                 </span>
                 <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 dark:text-blue-300 dark:bg-blue-950/70 dark:border-blue-800 px-2 py-0.5 rounded-full">
-                  ● Verified Ledger
+                  ● Internal Ledger · Prototype
                 </span>
               </div>
 
@@ -141,7 +130,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 <span className="text-xs sm:text-sm font-sans font-semibold text-blue-600 dark:text-blue-400 ml-2">USD</span>
               </div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Internal accounting ledger synchronized with banking transit accounts.
+                Calculated from KASHFLOW's internal prototype ledger. Provider balances are not yet synchronized or verified.
               </div>
             </div>
 
@@ -172,62 +161,11 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
               </button>
             </div>
 
-            {/* Financial Overview Curve (Vibrant Electric Blue Curve) */}
             <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <div className="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 mb-2">
-                <div className="flex items-center gap-3">
-                  <span>Financial overview (7 months)</span>
-                  <div className="hidden sm:flex items-center gap-2 text-[10px]">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-blue-600" />
-                      Available money
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-neutral-400">
-                      <span className="w-2 h-2 rounded-full bg-neutral-300 dark:bg-neutral-700" />
-                      Actual balance
-                    </span>
-                  </div>
-                </div>
-                <span className="font-mono tabular-nums text-blue-600 dark:text-blue-400 font-bold">+18.4% growth</span>
-              </div>
-
-              <div className="h-32 w-full relative">
-                {/* Floating tooltip like Dribbble shot */}
-                <div className="absolute top-2 right-12 z-10 bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-md flex items-center gap-1.5 pointer-events-none">
-                  <span>21 Aug:</span>
-                  <span className="font-bold text-blue-400 dark:text-blue-600">$8,780.90 USD</span>
-                </div>
-
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="blueCurveGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#2563EB" stopOpacity="0.20" />
-                      <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  {/* Area under curve */}
-                  <path
-                    d="M 0,90 Q 70,50 140,70 T 280,45 T 420,25 L 500,10 L 500,120 L 0,120 Z"
-                    fill="url(#blueCurveGradient)"
-                  />
-                  {/* Main line in Electric Blue */}
-                  <path
-                    d="M 0,90 Q 70,50 140,70 T 280,45 T 420,25 L 500,10"
-                    fill="none"
-                    stroke="#2563EB"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                  {/* Selected focal point */}
-                  <circle cx="500" cy="10" r="5" fill="#3B82F6" stroke="#FFFFFF" strokeWidth="2" />
-                </svg>
-              </div>
-
-              <div className="flex justify-between text-[11px] font-mono text-neutral-500 dark:text-neutral-400 mt-2">
-                {chartPoints.map((pt) => (
-                  <span key={pt.month}>{pt.month}</span>
-                ))}
-              </div>
+              <div className="text-sm font-semibold text-neutral-900 dark:text-white">Historical balance trend</div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                Not available yet. KASHFLOW has not migrated transaction history to persistent storage, so no historical trend or growth percentage is reported.
+              </p>
             </div>
           </div>
 
@@ -236,11 +174,11 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             <div className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 shadow-xs">
               <div className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Monthly activity</div>
               <div className="text-2xl font-black text-neutral-950 dark:text-white font-mono mt-1">
-                $3,240.00
+                —
               </div>
               <div className="flex items-center gap-2 mt-1.5 text-xs">
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">↗ 8.4%</span>
-                <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">vs previous month</span>
+                <span className="text-neutral-500 dark:text-neutral-400 font-mono">Not calculated</span>
+                <span className="text-neutral-500 dark:text-neutral-400 text-[11px]">Persistent history required</span>
               </div>
               <div className="mt-3">
                 <div className="flex justify-between text-[11px] text-neutral-500 dark:text-neutral-400 mb-1">
@@ -248,7 +186,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                   <span className="font-mono font-bold text-neutral-900 dark:text-white">64%</span>
                 </div>
                 <div className="h-1.5 w-full bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-600 rounded-full" style={{ width: '64%' }} />
+                  <div className="h-full bg-neutral-300 dark:bg-neutral-700 rounded-full" style={{ width: '0%' }} />
                 </div>
               </div>
             </div>
@@ -256,14 +194,14 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             <div className="bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Verified Net Cash Flow</span>
-                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-mono font-bold">Real-time</span>
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">Provider Reconciliation</span>
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400 font-mono font-bold">Not available</span>
                 </div>
                 <div className="text-2xl font-black text-neutral-950 dark:text-white font-mono mt-1">
-                  +$9,600.50
+                  —
                 </div>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
-                  Inflows exceed outflows across all settled rails this cycle.
+                  No verified provider settlement history is available yet.
                 </p>
               </div>
               <button
@@ -310,10 +248,10 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
             {/* Balance Middle Section */}
             <div className="my-5 relative z-10">
               <div className="text-[11px] text-blue-100 font-medium uppercase tracking-wider">
-                Card Balance
+                Wallet Balance · Preview
               </div>
               <div className="text-3xl font-extrabold text-white font-mono tabular-nums tracking-tight mt-0.5 flex items-center gap-2">
-                <span>{hideBalances ? '••••••••' : '$12,850.00'}</span>
+                <span>{hideBalances ? '••••••••' : `${totalBalanceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}</span>
                 {/* Contactless Waves Symbol */}
                 <span className="text-xs text-blue-100/90 rotate-90 inline-block font-mono font-bold tracking-widest">
                   ))))
