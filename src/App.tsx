@@ -229,9 +229,9 @@ export default function App() {
             <button onClick={async () => { await fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }); setAuthStatus('guest'); setAuthView('landing'); }} className="ml-4 rounded-full border border-neutral-200 dark:border-neutral-800 px-3 py-1.5 font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-900">Sign out</button>
           </div>
           <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span>Ledger: Double-Entry Balanced</span>
+            <span>Ledger: Prototype</span>
             <span>·</span>
-            <span className="text-neutral-900 dark:text-neutral-200 font-semibold">● Verified Operations</span>
+            <span className="text-neutral-900 dark:text-neutral-200 font-semibold">● Provider confirmation required</span>
           </div>
         </div>
       </footer>
