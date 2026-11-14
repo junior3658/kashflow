@@ -180,24 +180,24 @@ export class TransactionEngine {
       // are validated before the wallet mutation; no provider is called here.
       LedgerEngine.postTransaction(tx.id, [
         {
-          accountCode: '1010', // User Cash Account
-          entryType: 'CREDIT',
-          amount: tx.amount + tx.fee,
-          currency: tx.currency,
-          description: `Disbursement for ${tx.description}`,
-        },
-        {
-          accountCode: '2010', // Liability Deposit
+          accountCode: '2010', // Customer deposit liability decreases by amount + fee
           entryType: 'DEBIT',
-          amount: tx.amount,
+          amount: settlementTotal,
           currency: tx.currency,
           description: `Settlement: ${tx.description}`,
+        },
+        {
+          accountCode: '1010', // Cash asset decreases by the amount sent
+          entryType: 'CREDIT',
+          amount: tx.amount,
+          currency: tx.currency,
+          description: `Disbursement for ${tx.description}`,
         },
         ...(tx.fee > 0
           ? [
               {
-                accountCode: '4010', // Fee Revenue
-                entryType: 'DEBIT',
+                accountCode: '4010', // Platform fee revenue increases
+                entryType: 'CREDIT',
                 amount: tx.fee,
                 currency: tx.currency,
                 description: `Fee: ${tx.description}`,
@@ -234,8 +234,8 @@ export class TransactionEngine {
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
-    if (tx.status === 'SUCCEEDED') {
-      throw new Error('Cannot cancel an already succeeded transaction. Use refund instead.');
+    if (tx.status !== 'CREATED' && tx.status !== 'PENDING') {
+      throw new Error(`Cannot cancel a transaction with status '${tx.status}'.`);
     }
 
     if (tx.status === 'PENDING') {
@@ -262,8 +262,8 @@ export class TransactionEngine {
     // 1. Ledger reversal
     LedgerEngine.reverseTransaction(tx.id, reason);
 
-    // 2. Refund wallet balance
-    WalletService.applySettledCredit(tx.sourceWalletId, tx.amount);
+    // 2. Restore the full amount originally reserved, including the reversed fee.
+    WalletService.applySettledCredit(tx.sourceWalletId, tx.amount + tx.fee);
 
     tx.status = 'REFUNDED';
     tx.updatedAt = new Date().toISOString();
