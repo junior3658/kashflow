@@ -17,6 +17,11 @@
 - The transfer API creates a reservation before returning a draft and rejects provider values other than `INTERNAL`.
 - PayPal capture is temporarily disabled because the prototype does not yet persist PayPal order ownership or implement an atomic, idempotent capture-to-ledger workflow.
 - Malformed percent-encoded session cookies are rejected safely.
+- Email verification code consumption and account verification now occur in one SQLite transaction, preventing two concurrent requests from consuming the same code; failed-attempt increments are conditional and concurrency-safe.
+- Ledger posting validates positive safe-integer minor units, account/currency consistency, safe aggregate/account balances, and duplicate transaction IDs before appending a batch.
+- Transfer fee postings now reduce customer deposit liability, reduce cash by the sent amount, and credit platform fee revenue using normal accounting directions.
+- Cancellation is restricted to CREATED/PENDING; refund reversals restore the full originally reserved amount, including the reversed fee.
+- Currency exchange settlement is disabled because the former endpoint changed wallet balances and marked transactions SUCCEEDED without a balanced ledger batch or atomic reservation.
 - Transaction safety regression tests now cover successful pending settlement, cross-tenant wallet rejection, external-provider settlement rejection, insufficient-funds reservation rejection, idempotency payload conflicts, and separation of internal/provider balances.
 
 ## Important limitations
@@ -24,7 +29,7 @@
 This is a containment and hardening phase, **not** the SQLite financial-core migration.
 
 - Wallets, ledger entries, transactions, organizations, and idempotency records are still in-memory and are lost on process restart.
-- The current ledger chart and settlement mapping support only the USD internal-transfer path. EUR/CDF internal settlement is deliberately rejected until currency-specific accounts and balanced postings are implemented.
+- The current ledger chart and settlement mapping support only the USD internal-transfer path. EUR/CDF internal settlement is deliberately rejected until currency-specific accounts and balanced postings are implemented. Exchange quotes remain demonstrative; exchange settlement is disabled.
 - Shwary collection remains an accepted request only. Its callback is not cryptographically verified and cannot settle or credit funds.
 - Shwary payouts and merchant-balance reads remain blocked pending official endpoint and payload specifications.
 - PayPal OAuth, verified capture persistence, webhook verification, and reconciliation remain incomplete.
