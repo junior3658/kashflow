@@ -217,7 +217,6 @@ export default function App() {
       <ReceiveMoneyModal
         isOpen={isReceiveOpen}
         onClose={() => setIsReceiveOpen(false)}
-        onPaymentCaptured={refreshData}
       />
 
       {/* Minimalist Black and White Footer */}
