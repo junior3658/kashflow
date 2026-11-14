@@ -49,8 +49,7 @@ export class TransactionEngine {
           tx.provider === params.provider &&
           tx.orgId === params.orgId &&
           tx.recipientName === params.recipientName &&
-          tx.recipientAccount === params.recipientAccount &&
-          tx.description === params.description;
+          tx.recipientAccount === params.recipientAccount;
         if (!sameRequest) {
           throw new Error('Idempotency key has already been used with a different transaction payload.');
         }
