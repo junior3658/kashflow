@@ -33,7 +33,7 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
   onNavigateToTab,
 }) => {
   const primaryWallet = businessWallets[0];
-  const treasuryBalance = primaryWallet ? primaryWallet.internalAccountingBalance / 100 : 0;
+  const treasuryBalance = primaryWallet ? (primaryWallet.internalAccountingBalance - primaryWallet.pendingDebits) / 100 : 0;
 
   if (!businessWallets.length) {
     return (
