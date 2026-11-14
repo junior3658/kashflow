@@ -7,6 +7,7 @@ import { testLedgerEngine } from './ledger.test';
 import { testAIAgents } from './agents.test';
 import { testSecurityAuditScenarios } from './audit-scenarios.test';
 import { testTransactionSafety } from './transactions.test';
+import { testAuthVerificationConcurrency } from './auth-verification.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -15,6 +16,7 @@ async function runAll() {
 
   try {
     await testLedgerEngine();
+    await testAuthVerificationConcurrency();
     await testTransactionSafety();
     console.log('');
     await testAIAgents();
