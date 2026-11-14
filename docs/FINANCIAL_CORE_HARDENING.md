@@ -14,6 +14,8 @@
 - The balanced ledger batch is posted before the in-memory wallet balance is changed.
 - Internal wallet debits and credits no longer overwrite the provider-reported balance with the internal accounting balance.
 - Seed wallets now start with a zero provider amount and `NOT_SYNCED` status; the UI displays a provider amount only when its status is explicitly `VERIFIED`.
+- Business treasury, team and reconciliation views are hidden unless the authenticated account has a business wallet; the admin workspace checks the authenticated role.
+- Dashboard history, spending categories and provider reconciliation metrics now show unavailable states instead of fabricated sample amounts when no persisted data exists.
 - Personal dashboard sample history, fake card activation, fabricated contacts and unverified spending/reconciliation KPIs were removed or labelled unavailable; the business dashboard now hides demo treasury values when no authorized business wallet exists.
 - The simulated PayPal order endpoint is disabled; it no longer returns a fake checkout URL as if a provider order had been created.
 - The transfer API creates a reservation before returning a draft and rejects provider values other than `INTERNAL`.
