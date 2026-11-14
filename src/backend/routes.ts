@@ -34,11 +34,13 @@ function authThrottle(req: Request, res: Response, next: any) {
 
 apiRouter.post('/auth/register', authThrottle, async (req: Request, res: Response) => {
   try {
-    const { fullName, email, password } = req.body || {};
+    const { fullName, email, password, accountType, businessName } = req.body || {};
     if (typeof fullName !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ error: 'Full name, email and password are required.' });
     }
-    await registerAccount({ fullName, email, password });
+    if (accountType !== undefined && accountType !== 'PERSONAL' && accountType !== 'BUSINESS') return res.status(400).json({ error: 'Choose a personal or business account.' });
+    if (businessName !== undefined && typeof businessName !== 'string') return res.status(400).json({ error: 'Business name must be text.' });
+    await registerAccount({ fullName, email, password, accountType, businessName });
     res.status(201).json({ success: true, message: 'Verification email sent.' });
   } catch (error: any) { res.status(400).json({ error: error.message || 'Registration failed.' }); }
 });
