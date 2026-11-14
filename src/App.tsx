@@ -175,7 +175,6 @@ export default function App() {
         {currentTab === 'personal_exchange' && (
           <CurrencyExchangeView
             wallets={wallets}
-            onExchangeCompleted={refreshData}
           />
         )}
 
