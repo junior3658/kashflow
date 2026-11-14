@@ -46,7 +46,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
 
   // Primary USD Wallet
   const usdWallet = wallets.find((w) => w.currency === 'USD') || wallets[0];
-  const totalBalanceUsd = usdWallet ? usdWallet.internalAccountingBalance / 100 : 0;
+  const totalBalanceUsd = usdWallet ? (usdWallet.internalAccountingBalance - usdWallet.pendingDebits) / 100 : 0;
 
   return (
     <div className="space-y-6 pb-12">
