@@ -158,7 +158,7 @@ export async function registerAccount(value: { fullName: string; email: string; 
   const email = emailNorm(value.email);
 
   if (name.length < 2 || name.length > 100) throw new Error('Enter a valid full name.');
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 254) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     throw new Error('Enter a valid email address.');
   }
   if (value.password.length < 10 || value.password.length > 128) {
@@ -194,7 +194,7 @@ export async function registerAccount(value: { fullName: string; email: string; 
 
 export async function verifyEmail(emailInput: string, code: string) {
   const email = emailNorm(emailInput);
-  if (!/^\\d{6}$/.test(code)) throw new Error('Invalid or expired verification code.');
+  if (!/^\d{6}$/.test(code)) throw new Error('Invalid or expired verification code.');
 
   const user = sql.prepare(
     'SELECT id, email, full_name, created_at, verified_at FROM auth_users WHERE email = ?'
