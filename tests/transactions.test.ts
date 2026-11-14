@@ -1,5 +1,6 @@
 import { db } from '../src/backend/db';
 import { TransactionEngine } from '../src/backend/transactions';
+import { WalletService } from '../src/backend/wallets';
 
 export async function testTransactionSafety() {
   console.log('--- RUNNING TRANSACTION SAFETY TESTS ---');
@@ -23,6 +24,27 @@ export async function testTransactionSafety() {
   }
   console.log('✓ Pending reservation and internal settlement passed.');
 
+  let unreservedDebitRejected = false;
+  try { WalletService.applySettledDebit(sourceWalletId, 1); }
+  catch { unreservedDebitRejected = true; }
+  if (!unreservedDebitRejected) throw new Error('A wallet debit without a matching reservation was accepted.');
+  console.log('✓ Settlement requires a matching pending reservation.');
+
+  const releaseDraft = TransactionEngine.createDraft({
+    userId, type: 'TRANSFER', sourceWalletId, amount: 100, currency: 'USD',
+    provider: 'INTERNAL', description: 'Exact reservation release test',
+  });
+  TransactionEngine.markPending(releaseDraft.id);
+  let excessiveReleaseRejected = false;
+  try { WalletService.releasePendingDebit(sourceWalletId, 101); }
+  catch { excessiveReleaseRejected = true; }
+  if (!excessiveReleaseRejected) throw new Error('A release larger than the pending reservation was accepted.');
+  TransactionEngine.cancelTransaction(releaseDraft.id, 'Test cleanup');
+  if (db.wallets.get(sourceWalletId)!.pendingDebits !== 0) {
+    throw new Error('Exact reservation cancellation did not restore the pending debit amount.');
+  }
+  console.log('✓ Reservation release amount is checked exactly.');
+
   let ownershipRejected = false;
   try {
     TransactionEngine.createDraft({
@@ -32,6 +54,19 @@ export async function testTransactionSafety() {
   } catch { ownershipRejected = true; }
   if (!ownershipRejected) throw new Error('Cross-tenant source wallet access was not rejected.');
   console.log('✓ Cross-tenant wallet ownership check passed.');
+
+  let destinationOwnershipRejected = false;
+  try {
+    TransactionEngine.createDraft({
+      userId, type: 'TRANSFER', sourceWalletId, destinationWalletId: 'wlt_business_usd',
+      amount: 100, currency: 'USD', provider: 'INTERNAL',
+      description: 'Cross-tenant destination wallet test',
+    });
+  } catch { destinationOwnershipRejected = true; }
+  if (!destinationOwnershipRejected) {
+    throw new Error('Cross-tenant destination wallet access was not rejected.');
+  }
+  console.log('✓ Cross-tenant destination wallet check passed.');
 
   let externalSettlementRejected = false;
   const externalDraft = TransactionEngine.createDraft({
@@ -70,7 +105,6 @@ export async function testTransactionSafety() {
   const walletBeforeCredit = db.wallets.get(sourceWalletId)!;
   const providerBalanceBeforeCredit = walletBeforeCredit.externalProviderBalance;
   const internalBalanceBeforeCredit = walletBeforeCredit.internalAccountingBalance;
-  const { WalletService } = await import('../src/backend/wallets');
   WalletService.applySettledCredit(sourceWalletId, 250);
   if (walletBeforeCredit.externalProviderBalance !== providerBalanceBeforeCredit) {
     throw new Error('An internal ledger credit incorrectly changed the provider balance.');
