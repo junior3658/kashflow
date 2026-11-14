@@ -6,7 +6,11 @@ export async function testTransactionSafety() {
   console.log('--- RUNNING TRANSACTION SAFETY TESTS ---');
   const userId = 'usr_junior_01';
   const sourceWalletId = 'wlt_personal_usd';
-  const before = db.wallets.get(sourceWalletId)!.internalAccountingBalance;
+  const seedWallet = db.wallets.get(sourceWalletId)!;
+  const before = seedWallet.internalAccountingBalance;
+  if (seedWallet.externalProviderBalance !== 0 || seedWallet.externalProviderBalanceStatus !== 'NOT_SYNCED') {
+    throw new Error('Seed ledger balances must not be represented as verified provider funds.');
+  }
 
   const draft = TransactionEngine.createDraft({
     userId, type: 'TRANSFER', sourceWalletId, amount: 1000, currency: 'USD',
