@@ -57,10 +57,7 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
             <p className="mt-7 max-w-xl text-base leading-8 text-indigo-50/60 sm:text-lg">
               Connect the way you move money. Bring mobile payments, global payment experiences and digital asset insights into one clear financial workspace.
             </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <button onClick={onGetStarted} className="group inline-flex items-center justify-center gap-3 rounded-full bg-[#8b9cff] px-7 py-4 text-sm font-bold text-[#10152d] transition hover:-translate-y-1 hover:shadow-[0_15px_50px_rgba(217,197,141,.18)]">Create your account <ArrowRight size={17} className="transition group-hover:translate-x-1"/></button>
-              <button onClick={onSignIn} className="inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[.035] px-7 py-4 text-sm font-semibold text-white/85 backdrop-blur transition hover:bg-white/10">I already have an account</button>
-            </div>
+            <a href="#ecosystem" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-indigo-200 transition hover:text-white">Explore the KASHFLOW ecosystem <ArrowRight size={16}/></a>
             <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs text-indigo-50/45">
               <span className="inline-flex items-center gap-2"><ShieldCheck size={15} className="text-indigo-300"/> User-controlled transactions</span>
               <span className="inline-flex items-center gap-2"><LockKeyhole size={14} className="text-indigo-300"/> Security-first architecture</span>
@@ -109,7 +106,31 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
         <section id="security" className="mx-auto max-w-7xl px-6 pb-20 lg:px-10"><div className="flex flex-col justify-between gap-7 rounded-[2rem] border border-indigo-100/15 bg-gradient-to-br from-[#202e61] to-[#111a35] p-8 sm:p-12 md:flex-row md:items-center"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.22em] text-indigo-200/65">Built with responsibility</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Intelligence should support trust, not replace it.</h2><p className="mt-3 text-sm leading-7 text-indigo-50/55">KASHFLOW separates AI recommendations from backend validation and user authorization. Payment requests are not treated as completed until provider confirmation is verified.</p></div><div className="flex shrink-0 items-center gap-3 text-sm text-indigo-100"><ShieldCheck size={22}/><span>Security-first by design</span></div></div></section>
       </main>
 
-      <footer className="relative z-10 border-t border-white/[.08] px-6 py-8 text-center text-xs text-indigo-50/35"><strong className="tracking-[.2em] text-indigo-50/65">KASHFLOW</strong><span className="mx-3">·</span>Beyond Payments. One Intelligent Financial Experience.</footer>
+      <footer className="relative z-10 border-t border-white/[.08] bg-[#070b19]/90 px-6 pb-9 pt-12">
+        <div className="mx-auto max-w-7xl lg:px-4">
+          <div className="flex flex-col justify-between gap-5 border-b border-white/[.08] pb-8 sm:flex-row sm:items-end">
+            <div><p className="text-[10px] font-bold uppercase tracking-[.28em] text-indigo-300/75">Connected ecosystem</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">One flow. Multiple ways to move.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-indigo-50/45">A unified experience designed around global payment services, local mobile money and KASHFLOW intelligence.</p></div>
+            <span className="text-[10px] uppercase tracking-[.2em] text-indigo-100/35">Ecosystem overview · Not a claim of formal partnership</span>
+          </div>
+          <div className="grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {name:'PayPal',tag:'Global payment experience',mark:'P',style:'from-blue-500/25 to-sky-300/5',sub:'International payments'},
+              {name:'Mobile Money',tag:'Local payment rails',mark:'M',style:'from-emerald-400/20 to-teal-300/5',sub:'Airtel · Orange · M-Pesa'},
+              {name:'KASHFLOW',tag:'The intelligent layer',mark:'K',style:'from-indigo-400/25 to-violet-300/5',sub:'One financial workspace'},
+              {name:'Card networks',tag:'Card payment ecosystem',mark:'◉',style:'from-amber-300/20 to-orange-300/5',sub:'Card experiences'},
+            ].map((item)=><div key={item.name} className="group [perspective:1000px]">
+              <div className="relative h-36 rounded-2xl transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
+                <div className={`absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${item.style} p-5 [backface-visibility:hidden]`}>
+                  <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[.2em] text-indigo-100/45">KASHFLOW NETWORK</span><ArrowUpRight size={15} className="text-indigo-100/45"/></div>
+                  <div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-xl border border-white/15 bg-white/[.08] text-2xl font-black text-white shadow-lg">{item.mark}</span><div><strong className="block text-base text-white">{item.name}</strong><span className="mt-1 block text-[10px] text-indigo-50/50">{item.tag}</span></div></div>
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-indigo-200/20 bg-[#17234a] p-5 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"><span className="mb-2 text-[9px] font-bold uppercase tracking-[.2em] text-indigo-200/55">Designed to connect</span><strong className="text-sm text-white">{item.name}</strong><span className="mt-2 text-xs text-indigo-100/55">{item.sub}</span></div>
+              </div>
+            </div>)}
+          </div>
+          <div className="flex flex-col items-center justify-between gap-3 border-t border-white/[.08] pt-6 text-center text-[11px] text-indigo-50/35 sm:flex-row sm:text-left"><div><strong className="tracking-[.22em] text-indigo-50/75">KASHFLOW</strong><span className="mx-2">·</span>Beyond Payments. One Intelligent Financial Experience.</div><div className="flex items-center gap-2"><ShieldCheck size={13} className="text-indigo-300"/> AI recommends. You authorize. Providers confirm.</div><span>© {new Date().getFullYear()} KASHFLOW</span></div>
+        </div>
+      </footer>
     </div>
   );
 }
