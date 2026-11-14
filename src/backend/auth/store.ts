@@ -112,6 +112,7 @@ function addRuntimeUser(user: any) {
         name: `Primary ${currency} Wallet`,
         internalAccountingBalance: 0,
         externalProviderBalance: 0,
+        externalProviderBalanceStatus: 'NOT_SYNCED',
         pendingDebits: 0,
         pendingCredits: 0,
         status: 'ACTIVE',
