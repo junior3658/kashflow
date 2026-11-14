@@ -64,7 +64,7 @@ Total Debits = Total Credits
 
 Amounts are represented in integer minor units (for example, cents) in the ledger implementation. A posted correction should be represented by a reversal entry rather than silently editing the original accounting record.
 
-The application distinguishes internal accounting values, provider-related values, pending amounts and simulated crypto values. Demo balances shown in the interface are seeded sample data, not real bank or mobile-money balances.
+The application distinguishes internal accounting values, provider-reported values, pending amounts and simulated crypto values. Seeded internal ledger values are demo data; provider balances start as `NOT_SYNCED` and are not displayed as verified. No seeded amount represents real bank or mobile-money funds.
 
 ## Important implementation boundaries
 
