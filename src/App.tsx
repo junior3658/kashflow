@@ -56,8 +56,8 @@ export default function App() {
         }
         const data = await response.json();
         setCurrentUserRole(data.user?.role ?? 'PERSONAL_USER');
-        setPortalMode(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business' : 'personal');
-        setCurrentTab(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business_dashboard' : 'personal_dashboard');
+        setPortalMode(data.user?.role === 'PLATFORM_ADMIN' ? 'admin' : data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business' : 'personal');
+        setCurrentTab(data.user?.role === 'PLATFORM_ADMIN' ? 'admin_dashboard' : data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business_dashboard' : 'personal_dashboard');
         setAuthStatus('authenticated');
       })
       .catch(() => {
@@ -96,7 +96,7 @@ export default function App() {
   }
   if (authStatus === 'guest') {
     if (authView === 'landing') return <LandingPage onSignIn={() => setAuthView('login')} onGetStarted={() => setAuthView('register')} />;
-    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={async () => { const response = await fetch('/api/v1/auth/me', { credentials: 'include' }); const data = response.ok ? await response.json() : null; const role = data?.user?.role ?? 'PERSONAL_USER'; const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(role); setCurrentUserRole(role); setPortalMode(isBusiness ? 'business' : 'personal'); setCurrentTab(isBusiness ? 'business_dashboard' : 'personal_dashboard'); setAuthStatus('authenticated'); setAuthView('landing'); }} />;
+    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={async () => { const response = await fetch('/api/v1/auth/me', { credentials: 'include' }); const data = response.ok ? await response.json() : null; const role = data?.user?.role ?? 'PERSONAL_USER'; const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(role); const isAdmin = role === 'PLATFORM_ADMIN'; setCurrentUserRole(role); setPortalMode(isAdmin ? 'admin' : isBusiness ? 'business' : 'personal'); setCurrentTab(isAdmin ? 'admin_dashboard' : isBusiness ? 'business_dashboard' : 'personal_dashboard'); setAuthStatus('authenticated'); setAuthView('landing'); }} />;
   }
 
   return (
