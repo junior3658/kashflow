@@ -15,6 +15,7 @@ import {
   AuditLog,
   AIMessage,
 } from './types';
+import { restoreFinancialState, persistFinancialState } from './financial-persistence';
 
 export class KashflowDatabase {
   users: Map<string, User> = new Map();
@@ -31,6 +32,12 @@ export class KashflowDatabase {
 
   constructor() {
     this.seedDatabase();
+    // Existing SQLite state wins over demo seed data on every subsequent boot.
+    restoreFinancialState(this);
+  }
+
+  persist(): void {
+    persistFinancialState(this);
   }
 
   seedDatabase() {

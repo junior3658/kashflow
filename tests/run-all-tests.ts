@@ -8,6 +8,7 @@ import { testAIAgents } from './agents.test';
 import { testSecurityAuditScenarios } from './audit-scenarios.test';
 import { testTransactionSafety } from './transactions.test';
 import { testAuthVerificationConcurrency } from './auth-verification.test';
+import { testFinancialPersistence } from './financial-persistence.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -18,6 +19,7 @@ async function runAll() {
     await testLedgerEngine();
     await testAuthVerificationConcurrency();
     await testTransactionSafety();
+    await testFinancialPersistence();
     console.log('');
     await testAIAgents();
     console.log('');

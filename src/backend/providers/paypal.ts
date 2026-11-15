@@ -25,7 +25,7 @@ type PayPalJson = Record<string, any>;
 export class PayPalAdapter {
   private readonly clientId = process.env.PAYPAL_CLIENT_ID;
   private readonly clientSecret = process.env.PAYPAL_CLIENT_SECRET;
-  private readonly baseUrl = (process.env.PAYPAL_BASE_URL || 'https://api-m.sandbox.paypal.com').replace(/\\/+$/, '');
+  private readonly baseUrl = (process.env.PAYPAL_BASE_URL || 'https://api-m.sandbox.paypal.com').replace(/\/+$/, '');
   private readonly webhookId = process.env.PAYPAL_WEBHOOK_ID;
   private accessToken?: string;
   private tokenExpiresAt = 0;
