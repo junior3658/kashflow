@@ -39,32 +39,18 @@ export default function App() {
 
   // Theme state: default is LIGHT (white dominates), supports dual theme (Light / Dark)
   const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('kashflow_theme') === 'dark';
-    }
-    return false;
+    return true;
   });
 
   const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (next) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('kashflow_theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('kashflow_theme', 'light');
-      }
-      return next;
-    });
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('kashflow_theme', 'dark');
+    setIsDark(true);
   };
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('kashflow_theme', 'dark');
   }, [isDark]);
 
   useEffect(() => {
@@ -125,14 +111,15 @@ export default function App() {
       {/* Universal Navigation with Theme Switcher */}
       <Navigation
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        portalMode={portalMode}
-        onChangePortal={(mode) => {
-          setPortalMode(mode);
-          if (mode === 'personal') setCurrentTab('personal_dashboard');
-          if (mode === 'business') setCurrentTab('business_dashboard');
-          if (mode === 'admin') setCurrentTab('admin_dashboard');
+        onSelectTab={(tab) => {
+          const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(currentUserRole || '');
+          const isAdmin = currentUserRole === 'PLATFORM_ADMIN';
+          const personalTabs: NavTab[] = ['personal_dashboard', 'personal_wallets', 'personal_transactions', 'personal_exchange', 'personal_crypto', 'personal_analytics', 'kash_ai'];
+          const businessTabs: NavTab[] = ['business_dashboard', 'business_team', 'business_reconciliation', 'personal_transactions', 'kash_ai'];
+          const allowed = isAdmin ? ['admin_dashboard', 'kash_ai'] : isBusiness ? businessTabs : personalTabs;
+          if (allowed.includes(tab)) setCurrentTab(tab);
         }}
+        portalMode={portalMode}
         onOpenSend={() => setIsSendOpen(true)}
         onOpenReceive={() => setIsReceiveOpen(true)}
         onOpenAI={() => setIsAIOpen(true)}
