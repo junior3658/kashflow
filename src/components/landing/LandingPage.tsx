@@ -22,7 +22,7 @@ const floaters = [
 
 export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090d1f] text-[#f5f4ec] selection:bg-indigo-300 selection:text-[#06221d]">
+    <div className="min-h-screen overflow-hidden bg-[#050607] text-[#f5f4ec] selection:bg-indigo-300 selection:text-[#06221d]">
       <div className="pointer-events-none fixed inset-0 opacity-40" aria-hidden="true">
         <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-indigo-500/20 blur-[130px]" />
         <div className="absolute -right-40 top-1/3 h-[32rem] w-[32rem] rounded-full bg-teal-400/10 blur-[140px]" />
@@ -54,11 +54,11 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
             <h1 className="max-w-3xl text-5xl font-semibold leading-[1.04] tracking-[-.055em] sm:text-6xl lg:text-[4.65rem]">
               Your money,<br/><span className="bg-gradient-to-r from-[#c7d2fe] via-[#f7f1d9] to-indigo-200 bg-clip-text text-transparent">in one intelligent</span><br/>flow.
             </h1>
-            <p className="mt-7 max-w-xl text-base leading-8 text-indigo-50/60 sm:text-lg">
+            <p className="mt-7 max-w-xl text-base leading-8 text-white/60 sm:text-lg">
               Connect the way you move money. Bring mobile payments, global payment experiences and digital asset insights into one clear financial workspace.
             </p>
             <a href="#ecosystem" className="mt-9 inline-flex items-center gap-2 text-sm font-semibold text-indigo-200 transition hover:text-white">Explore the KASHFLOW ecosystem <ArrowRight size={16}/></a>
-            <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs text-indigo-50/45">
+            <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-3 text-xs text-white/45">
               <span className="inline-flex items-center gap-2"><ShieldCheck size={15} className="text-indigo-300"/> User-controlled transactions</span>
               <span className="inline-flex items-center gap-2"><LockKeyhole size={14} className="text-indigo-300"/> Security-first architecture</span>
             </div>
@@ -75,16 +75,16 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
             <div className="payment-cube-stage relative z-10 flex h-[390px] w-full items-center justify-center sm:h-[470px]" aria-label="Rotating three-dimensional cube showing PayPal, Mastercard and Mobile Money">
               <div className="cube-glow"/>
               <div className="payment-cube">
-                <div className="cube-face cube-front"><span className="cube-kicker">GLOBAL PAYMENTS</span><span className="paypal-mark">P</span><strong className="text-2xl tracking-tight">PayPal</strong><span className="cube-caption">Move money worldwide</span></div>
-                <div className="cube-face cube-right"><span className="cube-kicker">CARD NETWORK</span><div className="mastercard-mark"><i/><i/></div><strong className="text-xl tracking-[.12em]">mastercard</strong><span className="cube-caption">Pay with confidence</span></div>
-                <div className="cube-face cube-back"><span className="cube-kicker">LOCAL PAYMENTS</span><span className="mobile-money-mark"><Smartphone size={54}/><span className="mobile-signal">•••</span></span><strong className="text-2xl">Mobile Money</strong><span className="cube-caption">Airtel · Orange · M-Pesa</span></div>
-                <div className="cube-face cube-left"><span className="cube-kicker">ONE FINANCIAL FLOW</span><span className="grid h-16 w-16 place-items-center rounded-2xl border border-white/20 bg-white/10 text-4xl font-black">K</span><strong className="text-2xl tracking-[.14em]">KASHFLOW</strong><span className="cube-caption">One intelligent workspace</span></div>
-                <div className="cube-face cube-top"><span className="text-4xl font-black tracking-widest">K</span><span className="text-xs uppercase tracking-[.3em]">KASHFLOW</span></div>
-                <div className="cube-face cube-bottom"><span className="text-xs font-semibold uppercase tracking-[.3em]">CONNECTED FINANCE</span><span className="text-3xl">✦</span></div>
+                <div className="cube-face cube-front"><span className="cube-kicker">WALLETS & BALANCES</span><WalletCards size={48} className="text-indigo-200"/><strong className="text-2xl">Wallets</strong><span className="cube-caption">A clear view of your balances</span></div>
+                <div className="cube-face cube-right"><span className="cube-kicker">LOCAL PAYMENTS</span><Smartphone size={48} className="text-emerald-200"/><strong className="text-xl">Mobile Money</strong><span className="cube-caption">Local collection & payouts</span></div>
+                <div className="cube-face cube-back"><span className="cube-kicker">GLOBAL PAYMENTS</span><span className="paypal-mark">P</span><strong className="text-2xl">PayPal</strong><span className="cube-caption">Global payment experience</span></div>
+                <div className="cube-face cube-left"><span className="cube-kicker">CURRENCY TOOLS</span><Globe2 size={48} className="text-sky-200"/><strong className="text-2xl">FX Exchange</strong><span className="cube-caption">Explore currency conversion</span></div>
+                <div className="cube-face cube-top"><span className="cube-kicker">DIGITAL ASSETS</span><Bitcoin size={48} className="text-amber-200"/><strong className="text-xl">Crypto Sim</strong><span className="cube-caption">Market insights & simulation</span></div>
+                <div className="cube-face cube-bottom"><span className="cube-kicker">INTELLIGENT ASSISTANCE</span><Zap size={48} className="text-indigo-200"/><strong className="text-xl">KASH AI</strong><span className="cube-caption">Insights. You stay in control.</span></div>
               </div>
               <div className="cube-orbit cube-orbit-one"/><div className="cube-orbit cube-orbit-two"/>
             </div>
-            {floaters.map((item,i)=><motion.div key={item.label} animate={{y:[0,-10,0],x:[0,i%2?5:-5,0]}} transition={{duration:5+i*.7,repeat:Infinity,ease:'easeInOut',delay:item.delay}} style={{top:item.top,left:item.left,right:item.right,bottom:item.bottom}} className="absolute z-20 rounded-2xl border border-white/15 bg-[#0b3029]/90 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 text-[10px] font-bold text-[#c7d2fe]">{item.label}</span><span><strong className="block text-xs">{item.value}</strong><small className="text-[10px] text-indigo-200/65">{item.change}</small></span></div></motion.div>)}
+            {floaters.map((item,i)=><motion.div key={item.label} animate={{y:[0,-10,0],x:[0,i%2?5:-5,0]}} transition={{duration:5+i*.7,repeat:Infinity,ease:'easeInOut',delay:item.delay}} style={{top:item.top,left:item.left,right:item.right,bottom:item.bottom}} className="absolute z-20 rounded-2xl border border-white/15 bg-[#101a18]/90 px-4 py-3 shadow-xl shadow-black/20 backdrop-blur-xl"><div className="flex items-center gap-2"><span className="grid h-8 w-8 place-items-center rounded-xl bg-white/10 text-[10px] font-bold text-[#c7d2fe]">{item.label}</span><span><strong className="block text-xs">{item.value}</strong><small className="text-[10px] text-indigo-200/65">{item.change}</small></span></div></motion.div>)}
           </div>
         </section>
 
@@ -94,7 +94,7 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
               {icon: Smartphone,title:'Local payment rails',copy:'A mobile-money-first approach designed for everyday payments and collections.'},
               {icon: Globe2,title:'Global connections',copy:'A unified experience designed to connect local financial activity with global services.'},
               {icon: CircleDollarSign,title:'Digital asset insights',copy:'Explore market information and simulated crypto scenarios without custody or live trading.'},
-            ].map(({icon:Icon,title,copy})=><div key={title} className="flex gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-indigo-100/10 bg-indigo-200/[.07] text-indigo-200"><Icon size={20}/></span><div><h2 className="font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-indigo-50/50">{copy}</p></div></div>)}
+            ].map(({icon:Icon,title,copy})=><div key={title} className="flex gap-4"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[.045] text-indigo-100"><Icon size={20}/></span><div><h2 className="font-semibold">{title}</h2><p className="mt-2 text-sm leading-6 text-white/50">{copy}</p></div></div>)}
           </div>
         </section>
 
@@ -103,28 +103,30 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
           <div className="grid gap-5 sm:grid-cols-2"><div className="rounded-3xl border border-white/10 bg-white/[.035] p-6"><Zap className="text-[#a5b4fc]"/><h3 className="mt-5 font-semibold">One workspace</h3><p className="mt-2 text-sm leading-6 text-indigo-50/50">See your financial activity through a single, understandable interface.</p></div><div className="rounded-3xl border border-white/10 bg-white/[.035] p-6"><WalletCards className="text-indigo-200"/><h3 className="mt-5 font-semibold">Your decisions</h3><p className="mt-2 text-sm leading-6 text-indigo-50/50">AI can assist and recommend. You stay in control of financial actions.</p></div></div>
         </section>
 
-        <section id="security" className="mx-auto max-w-7xl px-6 pb-20 lg:px-10"><div className="flex flex-col justify-between gap-7 rounded-[2rem] border border-indigo-100/15 bg-gradient-to-br from-[#202e61] to-[#111a35] p-8 sm:p-12 md:flex-row md:items-center"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.22em] text-indigo-200/65">Built with responsibility</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Intelligence should support trust, not replace it.</h2><p className="mt-3 text-sm leading-7 text-indigo-50/55">KASHFLOW separates AI recommendations from backend validation and user authorization. Payment requests are not treated as completed until provider confirmation is verified.</p></div><div className="flex shrink-0 items-center gap-3 text-sm text-indigo-100"><ShieldCheck size={22}/><span>Security-first by design</span></div></div></section>
+        <section id="security" className="mx-auto max-w-7xl px-6 pb-20 lg:px-10"><div className="flex flex-col justify-between gap-7 rounded-[2rem] border border-indigo-100/15 bg-gradient-to-br from-[#17191d] via-[#101214] to-[#08090a] p-8 sm:p-12 md:flex-row md:items-center"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.22em] text-indigo-200/65">Built with responsibility</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Intelligence should support trust, not replace it.</h2><p className="mt-3 text-sm leading-7 text-indigo-50/55">KASHFLOW separates AI recommendations from backend validation and user authorization. Payment requests are not treated as completed until provider confirmation is verified.</p></div><div className="flex shrink-0 items-center gap-3 text-sm text-indigo-100"><ShieldCheck size={22}/><span>Security-first by design</span></div></div></section>
       </main>
 
-      <footer className="relative z-10 border-t border-white/[.08] bg-[#070b19]/90 px-6 pb-9 pt-12">
+      <footer className="relative z-10 border-t border-white/[.08] bg-[#030405]/95 px-6 pb-9 pt-12">
         <div className="mx-auto max-w-7xl lg:px-4">
           <div className="flex flex-col justify-between gap-5 border-b border-white/[.08] pb-8 sm:flex-row sm:items-end">
-            <div><p className="text-[10px] font-bold uppercase tracking-[.28em] text-indigo-300/75">Connected ecosystem</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">One flow. Multiple ways to move.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-indigo-50/45">A unified experience designed around global payment services, local mobile money and KASHFLOW intelligence.</p></div>
+            <div><p className="text-[10px] font-bold uppercase tracking-[.28em] text-white/55">Connected ecosystem</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">One flow. Multiple ways to move.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-indigo-50/45">A unified experience designed around global payment services, local mobile money and KASHFLOW intelligence.</p></div>
             <span className="text-[10px] uppercase tracking-[.2em] text-indigo-100/35">Ecosystem overview · Not a claim of formal partnership</span>
           </div>
-          <div className="grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              {name:'PayPal',tag:'Global payment experience',mark:'P',style:'from-blue-500/25 to-sky-300/5',sub:'International payments'},
-              {name:'Mobile Money',tag:'Local payment rails',mark:'M',style:'from-emerald-400/20 to-teal-300/5',sub:'Airtel · Orange · M-Pesa'},
-              {name:'KASHFLOW',tag:'The intelligent layer',mark:'K',style:'from-indigo-400/25 to-violet-300/5',sub:'One financial workspace'},
-              {name:'Card networks',tag:'Card payment ecosystem',mark:'◉',style:'from-amber-300/20 to-orange-300/5',sub:'Card experiences'},
+              {name:'Wallets & Balances',tag:'Your financial overview',mark:'◫',style:'from-white/[.10] to-white/[.02]',sub:'Understand internal and provider balance distinctions.'},
+              {name:'Mobile Money',tag:'Local payment experience',mark:'M',style:'from-emerald-300/15 to-white/[.02]',sub:'Collection and payout workflows with provider confirmation.'},
+              {name:'PayPal',tag:'Global payment experience',mark:'P',style:'from-sky-300/15 to-white/[.02]',sub:'A place for global payment journeys as supported connections become available.'},
+              {name:'FX Exchange',tag:'Currency conversion tools',mark:'↔',style:'from-violet-300/15 to-white/[.02]',sub:'Explore exchange rates and conversion scenarios.'},
+              {name:'Crypto Simulation',tag:'Digital asset insights',mark:'₿',style:'from-amber-300/15 to-white/[.02]',sub:'Learn from market data and simulated scenarios, without custody or live trading.'},
+              {name:'KASH AI & Analytics',tag:'Intelligence and clarity',mark:'✦',style:'from-indigo-300/15 to-white/[.02]',sub:'AI-assisted insights that inform decisions without authorizing transactions.'},
             ].map((item)=><div key={item.name} className="group [perspective:1000px]">
-              <div className="relative h-36 rounded-2xl transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
-                <div className={`absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${item.style} p-5 [backface-visibility:hidden]`}>
-                  <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[.2em] text-indigo-100/45">KASHFLOW NETWORK</span><ArrowUpRight size={15} className="text-indigo-100/45"/></div>
-                  <div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-xl border border-white/15 bg-white/[.08] text-2xl font-black text-white shadow-lg">{item.mark}</span><div><strong className="block text-base text-white">{item.name}</strong><span className="mt-1 block text-[10px] text-indigo-50/50">{item.tag}</span></div></div>
+              <div className="relative h-40 rounded-2xl transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)] motion-reduce:transition-none">
+                <div className={`absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${item.style} p-5 shadow-[0_18px_55px_rgba(0,0,0,.28)] [backface-visibility:hidden]`}>
+                  <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[.2em] text-white/40">KASHFLOW MODULE</span><ArrowUpRight size={15} className="text-white/45"/></div>
+                  <div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-xl border border-white/15 bg-white/[.07] text-2xl font-black text-white shadow-lg">{item.mark}</span><div><strong className="block text-base text-white">{item.name}</strong><span className="mt-1 block text-[10px] text-white/45">{item.tag}</span></div></div>
                 </div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-indigo-200/20 bg-[#17234a] p-5 text-center [backface-visibility:hidden] [transform:rotateY(180deg)]"><span className="mb-2 text-[9px] font-bold uppercase tracking-[.2em] text-indigo-200/55">Designed to connect</span><strong className="text-sm text-white">{item.name}</strong><span className="mt-2 text-xs text-indigo-100/55">{item.sub}</span></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-white/15 bg-[#17191b] p-5 text-center shadow-[0_18px_55px_rgba(0,0,0,.35)] [backface-visibility:hidden] [transform:rotateY(180deg)]"><span className="mb-2 text-[9px] font-bold uppercase tracking-[.2em] text-white/40">Inside KASHFLOW</span><strong className="text-sm text-white">{item.name}</strong><span className="mt-2 text-xs leading-5 text-white/55">{item.sub}</span></div>
               </div>
             </div>)}
           </div>
