@@ -123,8 +123,6 @@ export default function App() {
         onOpenSend={() => setIsSendOpen(true)}
         onOpenReceive={() => setIsReceiveOpen(true)}
         onOpenAI={() => setIsAIOpen(true)}
-        isDark={isDark}
-        onToggleTheme={toggleTheme}
       />
 
       {/* Main Viewport Container (1440px max width desktop baseline) */}
