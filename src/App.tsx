@@ -37,21 +37,14 @@ export default function App() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
-  // Theme state: default is LIGHT (white dominates), supports dual theme (Light / Dark)
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    return true;
-  });
-
-  const toggleTheme = () => {
-    document.documentElement.classList.add('dark');
-    localStorage.setItem('kashflow_theme', 'dark');
-    setIsDark(true);
-  };
+  // KASHFLOW uses one consistent near-black workspace theme across every authenticated screen.
+  const isDark = true;
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    document.documentElement.style.colorScheme = 'dark';
     localStorage.setItem('kashflow_theme', 'dark');
-  }, [isDark]);
+  }, []);
 
   useEffect(() => {
     fetch('/api/v1/auth/me', { credentials: 'include' })
@@ -126,7 +119,7 @@ export default function App() {
       />
 
       {/* Main Viewport Container (1440px max width desktop baseline) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 sm:pb-8">
         {currentTab === 'personal_dashboard' && (
           <PersonalDashboard
             wallets={wallets}
