@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound, Building2, Globe2, Sparkles, ArrowRight, Smartphone, CreditCard } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck, UserRound, Building2, Globe2, Sparkles, ArrowRight, Smartphone, Bitcoin, WalletCards, ArrowLeftRight, BrainCircuit } from 'lucide-react';
 
 type AuthPageProps = { initialMode: 'login' | 'register'; onBack: () => void; onAuthenticated: () => void };
 type AccountType = 'PERSONAL' | 'BUSINESS';
@@ -61,12 +61,12 @@ export function AuthPage({ initialMode, onBack, onAuthenticated }: AuthPageProps
             <div className="payment-cube-stage relative mx-auto mt-8 flex h-[330px] w-full max-w-[480px] items-center justify-center">
               <div className="cube-glow"/>
               <div className="payment-cube">
-                <div className="cube-face cube-front"><span className="cube-kicker">GLOBAL PAYMENTS</span><span className="paypal-mark">P</span><strong className="text-2xl">PayPal</strong><span className="cube-caption">Global payment experience</span></div>
-                <div className="cube-face cube-right"><span className="cube-kicker">CARD NETWORK</span><div className="mastercard-mark"><i/><i/></div><strong className="text-xl tracking-[.12em]">mastercard</strong><span className="cube-caption">Card payment ecosystem</span></div>
-                <div className="cube-face cube-back"><span className="cube-kicker">LOCAL PAYMENTS</span><span className="mobile-money-mark"><Smartphone size={54}/></span><strong className="text-xl">Mobile Money</strong><span className="cube-caption">Airtel · Orange · M-Pesa</span></div>
-                <div className="cube-face cube-left"><span className="cube-kicker">ONE FINANCIAL FLOW</span><span className="grid h-16 w-16 place-items-center rounded-2xl border border-white/20 bg-white/10 text-4xl font-black">K</span><strong className="text-2xl tracking-[.14em]">KASHFLOW</strong><span className="cube-caption">One intelligent workspace</span></div>
-                <div className="cube-face cube-top"><span className="text-4xl font-black tracking-widest">K</span><span className="text-xs uppercase tracking-[.3em]">KASHFLOW</span></div>
-                <div className="cube-face cube-bottom"><span className="text-xs font-semibold uppercase tracking-[.3em]">CONNECTED FINANCE</span><span className="text-3xl">✦</span></div>
+                <div className="cube-face cube-front"><span className="cube-kicker">WALLETS & BALANCES</span><WalletCards size={48} className="text-indigo-200"/><strong className="text-xl">Wallets</strong><span className="cube-caption">A clear view of your balances</span></div>
+                <div className="cube-face cube-right"><span className="cube-kicker">LOCAL PAYMENTS</span><Smartphone size={48} className="text-emerald-200"/><strong className="text-xl">Mobile Money</strong><span className="cube-caption">Local collection & payouts</span></div>
+                <div className="cube-face cube-back"><span className="cube-kicker">GLOBAL PAYMENTS</span><Globe2 size={48} className="text-sky-200"/><strong className="text-2xl">PayPal</strong><span className="cube-caption">Global payment experience</span></div>
+                <div className="cube-face cube-left"><span className="cube-kicker">CURRENCY TOOLS</span><ArrowLeftRight size={48} className="text-violet-200"/><strong className="text-xl">FX Exchange</strong><span className="cube-caption">Explore conversion scenarios</span></div>
+                <div className="cube-face cube-top"><span className="cube-kicker">DIGITAL ASSETS</span><Bitcoin size={48} className="text-amber-200"/><strong className="text-xl">Crypto Sim</strong><span className="cube-caption">Market insights & simulation</span></div>
+                <div className="cube-face cube-bottom"><span className="cube-kicker">INTELLIGENT ASSISTANCE</span><BrainCircuit size={48} className="text-indigo-200"/><strong className="text-xl">KASH AI</strong><span className="cube-caption">Insights. You stay in control.</span></div>
               </div>
               <div className="cube-orbit cube-orbit-one"/><div className="cube-orbit cube-orbit-two"/>
             </div>
