@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Bitcoin, BrainCircuit, CircleDollarSign, CreditCard, Globe2, LockKeyhole, ShieldCheck, Smartphone, WalletCards, ArrowLeftRight, ChartNoAxesCombined, Landmark, } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Bitcoin, BrainCircuit, CircleDollarSign, CreditCard, Globe2, LockKeyhole, ShieldCheck, Smartphone, WalletCards, ArrowLeftRight } from 'lucide-react';
 
 type LandingPageProps = {
   onSignIn: () => void;
