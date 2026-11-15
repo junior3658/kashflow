@@ -69,18 +69,23 @@ export default function App() {
   // Fetch Wallets & Transactions
   const refreshData = async () => {
     try {
-      const [wPersonalRes, wBusinessRes, txRes] = await Promise.all([
-        fetch('/api/v1/wallets?type=PERSONAL'),
-        fetch('/api/v1/wallets?type=BUSINESS'),
-        fetch('/api/v1/transactions'),
+      const walletType = portalMode === 'business' ? 'BUSINESS' : 'PERSONAL';
+      const [walletRes, txRes] = await Promise.all([
+        fetch(`/api/v1/wallets?type=${walletType}`, { credentials: 'include' }),
+        fetch('/api/v1/transactions', { credentials: 'include' }),
       ]);
 
-      const wPersonalData = await wPersonalRes.json();
-      const wBusinessData = await wBusinessRes.json();
+      if (!walletRes.ok || !txRes.ok) throw new Error('Unable to load the authenticated workspace data.');
+      const walletData = await walletRes.json();
       const txData = await txRes.json();
 
-      setWallets(wPersonalData.wallets || []);
-      setBusinessWallets(wBusinessData.wallets || []);
+      if (portalMode === 'business') {
+        setBusinessWallets(walletData.wallets || []);
+        setWallets([]);
+      } else {
+        setWallets(walletData.wallets || []);
+        setBusinessWallets([]);
+      }
       setTransactions(txData.transactions || []);
     } catch (err) {
       console.error('Failed to load application data:', err);
