@@ -160,29 +160,46 @@ for (const user of sql.prepare(
 }
 
 async function sendCode(user: any) {
-  const now = Date.now();
-  const last = sql.prepare(
-    'SELECT created_at FROM verification_codes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
-  ).get(user.id) as any;
-
-  if (last && now - last.created_at < 60000) {
-    throw new Error('Please wait before requesting another verification email.');
-  }
-
   const code = String(randomInt(0, 1000000)).padStart(6, '0');
   const id = randomBytes(16).toString('hex');
   const codeHash = await passwordHash(code, id);
 
-  sql.prepare(
-    'INSERT INTO verification_codes(id, user_id, code_hash, expires_at, created_at) VALUES(?,?,?,?,?)'
-  ).run(id, user.id, codeHash, now + CODE_MS, now);
+  // BEGIN IMMEDIATE serializes concurrent resend attempts across processes. The
+  // cooldown check and insertion therefore form one atomic operation.
+  const issueCode = sql.transaction.immediate(() => {
+    const now = Date.now();
+    const last = sql.prepare(
+      'SELECT created_at FROM verification_codes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(user.id) as any;
 
-  await sendVerificationEmail({
-    to: user.email,
-    fullName: user.full_name,
-    code,
-    expiresInMinutes: 10,
+    if (last && now - last.created_at < 60000) {
+      throw new Error('Please wait before requesting another verification email.');
+    }
+
+    // Only the newest issued code remains usable.
+    sql.prepare(
+      'UPDATE verification_codes SET consumed_at = ? WHERE user_id = ? AND consumed_at IS NULL'
+    ).run(now, user.id);
+    sql.prepare(
+      'INSERT INTO verification_codes(id, user_id, code_hash, expires_at, created_at) VALUES(?,?,?,?,?)'
+    ).run(id, user.id, codeHash, now + CODE_MS, now);
   });
+  issueCode();
+
+  try {
+    await sendVerificationEmail({
+      to: user.email,
+      fullName: user.full_name,
+      code,
+      expiresInMinutes: 10,
+    });
+  } catch (error) {
+    // A code that was not delivered must not remain valid or block a retry.
+    sql.prepare(
+      'DELETE FROM verification_codes WHERE id = ? AND consumed_at IS NULL'
+    ).run(id);
+    throw error;
+  }
 }
 
 export async function registerAccount(value: { fullName: string; email: string; password: string; accountType?: 'PERSONAL' | 'BUSINESS'; businessName?: string }) {
@@ -292,7 +309,18 @@ export async function resendVerification(emailInput: string) {
     'SELECT id, email, full_name, verified_at FROM auth_users WHERE email = ?'
   ).get(emailNorm(emailInput)) as any;
 
-  if (user && !user.verified_at) await sendCode(user);
+  if (user && !user.verified_at) {
+    try {
+      await sendCode(user);
+    } catch (error) {
+      // Keep the resend endpoint indistinguishable for unknown addresses and
+      // requests inside the cooldown window.
+      if (error instanceof Error && error.message === 'Please wait before requesting another verification email.') {
+        return;
+      }
+      throw error;
+    }
+  }
 }
 
 export async function loginAccount(emailInput: string, password: string) {
