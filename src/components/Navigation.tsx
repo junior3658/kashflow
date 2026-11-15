@@ -217,7 +217,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                 ['business_team', 'Team & access'], ['business_reconciliation', 'Reconciliation'],
               ].map(([tab, label]) => <button key={tab} onClick={() => { onSelectTab(tab as NavTab); setMobileMenuOpen(false); }} className="rounded-xl border border-neutral-800 bg-neutral-900/80 px-3 py-3 text-left font-medium text-neutral-200">{label}</button>)}
               {portalMode === 'admin' && <button onClick={() => { onSelectTab('admin_dashboard'); setMobileMenuOpen(false); }} className="rounded-xl border border-neutral-800 bg-neutral-900/80 px-3 py-3 text-left font-medium text-neutral-200">Security audit</button>}
-            </div>/div>
+            </div>
           </div>
         )}
       </header>
