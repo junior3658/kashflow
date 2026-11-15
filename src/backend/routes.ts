@@ -206,6 +206,10 @@ apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 4. PAYPAL INTEGRATION
 // -------------------------------------------------------------
+apiRouter.get('/payments/paypal/capabilities', (_req: Request, res: Response) => {
+  res.json(paypalAdapter.getCapabilities());
+});
+
 apiRouter.post('/payments/paypal/orders', (_req: Request, res: Response) => {
   // The current adapter returns a simulated order and approval URL; it does not
   // create an order with PayPal. Keep this endpoint disabled to avoid presenting
