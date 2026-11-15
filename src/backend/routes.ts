@@ -109,7 +109,11 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 apiRouter.get('/wallets', (req: Request, res: Response) => {
   const type = req.query.type as any;
   const user = db.users.get((req as any).userId)!;
-  const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
+  // A personal account must never read the business wallet collection by changing query parameters.
+  if (type === 'BUSINESS' && !user.currentOrgId) {
+    return res.status(403).json({ error: 'A verified business workspace is required to access business wallets.' });
+  }
+  const ownerId = type === 'BUSINESS' ? user.currentOrgId! : user.id;
   const wallets = WalletService.getWalletsByOwner(ownerId, type);
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);
   res.json({
