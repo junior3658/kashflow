@@ -1,6 +1,6 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, ArrowUpRight, Bitcoin, Check, CircleDollarSign, CreditCard, Globe2, LockKeyhole, MoveUpRight, ShieldCheck, Smartphone, WalletCards, Zap } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowRight, ArrowUpRight, Bitcoin, BrainCircuit, CircleDollarSign, CreditCard, Globe2, LockKeyhole, ShieldCheck, Smartphone, WalletCards, ArrowLeftRight, ChartNoAxesCombined, Landmark, } from 'lucide-react';
 
 type LandingPageProps = {
   onSignIn: () => void;
@@ -21,6 +21,21 @@ const floaters = [
 ];
 
 export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
+  const footerModules = [
+    { name: 'Wallets & Balances', tag: 'Your financial overview', icon: WalletCards, tone: 'text-indigo-200', global: 'Digital wallets provide a structured place to view and organize balances across financial services.', app: 'KASHFLOW brings internal ledger balances and provider balances into one view, while clearly distinguishing verified funds from estimates and prototype data.' },
+    { name: 'Mobile Money', tag: 'Local payment experience', icon: Smartphone, tone: 'text-emerald-200', global: 'Mobile money enables people to send, receive and store value through mobile-network financial services.', app: 'KASHFLOW is designed to connect local collection and payout journeys through supported providers. A payment is only marked complete after verified provider confirmation.' },
+    { name: 'PayPal', tag: 'Global payment experience', icon: Globe2, tone: 'text-sky-200', global: 'PayPal is a global digital payment service used for online payments and transfers where its services are available.', app: 'KASHFLOW reserves a place for PayPal payment experiences and orchestration. Availability depends on supported account, region and API capabilities; no connection is implied until configured.' },
+    { name: 'FX Exchange', tag: 'Currency conversion tools', icon: ArrowLeftRight, tone: 'text-violet-200', global: 'Foreign-exchange tools help users understand how one currency converts into another using an exchange rate.', app: 'KASHFLOW provides an exchange workspace for viewing conversion scenarios and rates. Any real conversion requires a supported provider and explicit user confirmation.' },
+    { name: 'Crypto Simulation', tag: 'Digital asset insights', icon: Bitcoin, tone: 'text-amber-200', global: 'Crypto market tools help users explore digital-asset prices, market movements and potential scenarios.', app: 'KASHFLOW offers market insights and simulation for learning and analysis. It does not custody crypto or execute live crypto trades.' },
+    { name: 'KASH AI & Analytics', tag: 'Intelligence and clarity', icon: BrainCircuit, tone: 'text-indigo-200', global: 'AI analytics can summarize financial activity, identify patterns and help people reason about possible decisions.', app: 'KASH AI provides explanations and recommendations using available data. Deterministic backend rules validate actions, and the user remains responsible for authorization.' },
+  ];
+  const [activeModule, setActiveModule] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setActiveModule((current) => (current + 1) % footerModules.length), 4000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const ActiveModuleIcon = footerModules[activeModule].icon;
+
   return (
     <div className="min-h-screen overflow-hidden bg-[#050607] text-[#f5f4ec] selection:bg-indigo-300 selection:text-[#06221d]">
       <div className="pointer-events-none fixed inset-0 opacity-40" aria-hidden="true">
@@ -77,7 +92,7 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
               <div className="payment-cube">
                 <div className="cube-face cube-front"><span className="cube-kicker">WALLETS & BALANCES</span><WalletCards size={48} className="text-indigo-200"/><strong className="text-2xl">Wallets</strong><span className="cube-caption">A clear view of your balances</span></div>
                 <div className="cube-face cube-right"><span className="cube-kicker">LOCAL PAYMENTS</span><Smartphone size={48} className="text-emerald-200"/><strong className="text-xl">Mobile Money</strong><span className="cube-caption">Local collection & payouts</span></div>
-                <div className="cube-face cube-back"><span className="cube-kicker">GLOBAL PAYMENTS</span><span className="paypal-mark">P</span><strong className="text-2xl">PayPal</strong><span className="cube-caption">Global payment experience</span></div>
+                <div className="cube-face cube-back"><span className="cube-kicker">GLOBAL PAYMENTS</span><span className="grid h-14 w-14 place-items-center rounded-2xl border border-sky-200/20 bg-sky-300/10 text-sky-200"><Globe2 size={34}/></span><strong className="text-2xl">PayPal</strong><span className="cube-caption">Global payment experience</span></div>
                 <div className="cube-face cube-left"><span className="cube-kicker">CURRENCY TOOLS</span><Globe2 size={48} className="text-sky-200"/><strong className="text-2xl">FX Exchange</strong><span className="cube-caption">Explore currency conversion</span></div>
                 <div className="cube-face cube-top"><span className="cube-kicker">DIGITAL ASSETS</span><Bitcoin size={48} className="text-amber-200"/><strong className="text-xl">Crypto Sim</strong><span className="cube-caption">Market insights & simulation</span></div>
                 <div className="cube-face cube-bottom"><span className="cube-kicker">INTELLIGENT ASSISTANCE</span><Zap size={48} className="text-indigo-200"/><strong className="text-xl">KASH AI</strong><span className="cube-caption">Insights. You stay in control.</span></div>
@@ -112,23 +127,37 @@ export function LandingPage({ onSignIn, onGetStarted }: LandingPageProps) {
             <div><p className="text-[10px] font-bold uppercase tracking-[.28em] text-white/55">Connected ecosystem</p><h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">One flow. Multiple ways to move.</h2><p className="mt-2 max-w-xl text-sm leading-6 text-indigo-50/45">A unified experience designed around global payment services, local mobile money and KASHFLOW intelligence.</p></div>
             <span className="text-[10px] uppercase tracking-[.2em] text-indigo-100/35">Ecosystem overview · Not a claim of formal partnership</span>
           </div>
-          <div className="grid gap-4 py-8 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {name:'Wallets & Balances',tag:'Your financial overview',mark:'◫',style:'from-white/[.10] to-white/[.02]',sub:'Understand internal and provider balance distinctions.'},
-              {name:'Mobile Money',tag:'Local payment experience',mark:'M',style:'from-emerald-300/15 to-white/[.02]',sub:'Collection and payout workflows with provider confirmation.'},
-              {name:'PayPal',tag:'Global payment experience',mark:'P',style:'from-sky-300/15 to-white/[.02]',sub:'A place for global payment journeys as supported connections become available.'},
-              {name:'FX Exchange',tag:'Currency conversion tools',mark:'↔',style:'from-violet-300/15 to-white/[.02]',sub:'Explore exchange rates and conversion scenarios.'},
-              {name:'Crypto Simulation',tag:'Digital asset insights',mark:'₿',style:'from-amber-300/15 to-white/[.02]',sub:'Learn from market data and simulated scenarios, without custody or live trading.'},
-              {name:'KASH AI & Analytics',tag:'Intelligence and clarity',mark:'✦',style:'from-indigo-300/15 to-white/[.02]',sub:'AI-assisted insights that inform decisions without authorizing transactions.'},
-            ].map((item)=><div key={item.name} className="group [perspective:1000px]">
-              <div className="relative h-40 rounded-2xl transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)] motion-reduce:transition-none">
-                <div className={`absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${item.style} p-5 shadow-[0_18px_55px_rgba(0,0,0,.28)] [backface-visibility:hidden]`}>
-                  <div className="flex items-center justify-between"><span className="text-[9px] font-bold uppercase tracking-[.2em] text-white/40">KASHFLOW MODULE</span><ArrowUpRight size={15} className="text-white/45"/></div>
-                  <div className="flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-xl border border-white/15 bg-white/[.07] text-2xl font-black text-white shadow-lg">{item.mark}</span><div><strong className="block text-base text-white">{item.name}</strong><span className="mt-1 block text-[10px] text-white/45">{item.tag}</span></div></div>
-                </div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-white/15 bg-[#17191b] p-5 text-center shadow-[0_18px_55px_rgba(0,0,0,.35)] [backface-visibility:hidden] [transform:rotateY(180deg)]"><span className="mb-2 text-[9px] font-bold uppercase tracking-[.2em] text-white/40">Inside KASHFLOW</span><strong className="text-sm text-white">{item.name}</strong><span className="mt-2 text-xs leading-5 text-white/55">{item.sub}</span></div>
-              </div>
-            </div>)}
+          <div className="grid gap-6 py-8 lg:grid-cols-[.8fr_1.2fr]">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+              {footerModules.map((item,index)=>{
+                const Icon=item.icon;
+                const selected=activeModule===index;
+                return <button key={item.name} type="button" onClick={()=>setActiveModule(index)} aria-pressed={selected}
+                  className={`group flex min-h-[88px] items-center gap-3 rounded-2xl border p-3 text-left transition duration-300 ${selected?'border-white/25 bg-white/[.10] shadow-[0_12px_35px_rgba(0,0,0,.28)]':'border-white/[.07] bg-white/[.025] hover:border-white/15 hover:bg-white/[.055]'}`}>
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-black/20 ${item.tone}`}><Icon size={21}/></span>
+                  <span className="min-w-0"><strong className="block text-xs leading-5 text-white">{item.name}</strong><span className="mt-1 block text-[10px] leading-4 text-white/40">{item.tag}</span></span>
+                  {selected&&<span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,.8)]"/>}
+                </button>;
+              })}
+            </div>
+            <div className="relative min-h-[280px] overflow-hidden rounded-[1.7rem] border border-white/10 bg-gradient-to-br from-white/[.08] via-white/[.035] to-transparent p-6 shadow-[0_25px_80px_rgba(0,0,0,.32)] sm:p-8">
+              <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/[.045] blur-3xl"/>
+              <AnimatePresence mode="wait">
+                <motion.div key={activeModule} initial={{opacity:0,y:12,filter:'blur(5px)'}} animate={{opacity:1,y:0,filter:'blur(0px)'}} exit={{opacity:0,y:-8,filter:'blur(4px)'}} transition={{duration:.35}} className="relative">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[.2em] text-white/45">KASHFLOW ecosystem · {String(activeModule+1).padStart(2,'0')} / 06</span>
+                    <ActiveModuleIcon size={27} className={footerModules[activeModule].tone}/>
+                  </div>
+                  <h3 className="mt-5 text-2xl font-semibold tracking-tight text-white sm:text-3xl">{footerModules[activeModule].name}</h3>
+                  <p className="mt-1 text-xs text-white/40">{footerModules[activeModule].tag}</p>
+                  <div className="mt-6 grid gap-5 sm:grid-cols-2">
+                    <div><p className="text-[9px] font-bold uppercase tracking-[.2em] text-white/40">Son utilité globale</p><p className="mt-2 text-sm leading-6 text-white/65">{footerModules[activeModule].global}</p></div>
+                    <div><p className="text-[9px] font-bold uppercase tracking-[.2em] text-indigo-200/65">Son rôle dans KASHFLOW</p><p className="mt-2 text-sm leading-6 text-white/65">{footerModules[activeModule].app}</p></div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+              <div className="absolute bottom-0 left-0 h-[2px] w-full bg-white/[.06]"><motion.div key={activeModule} initial={{width:'0%'}} animate={{width:'100%'}} transition={{duration:4,ease:'linear'}} className="h-full bg-gradient-to-r from-white/30 via-indigo-200/80 to-white/30"/></div>
+            </div>
           </div>
           <div className="flex flex-col items-center justify-between gap-3 border-t border-white/[.08] pt-6 text-center text-[11px] text-indigo-50/35 sm:flex-row sm:text-left"><div><strong className="tracking-[.22em] text-indigo-50/75">KASHFLOW</strong><span className="mx-2">·</span>Beyond Payments. One Intelligent Financial Experience.</div><div className="flex items-center gap-2"><ShieldCheck size={13} className="text-indigo-300"/> AI recommends. You authorize. Providers confirm.</div><span>© {new Date().getFullYear()} KASHFLOW</span></div>
         </div>
