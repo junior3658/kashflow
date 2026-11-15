@@ -17,8 +17,6 @@ import {
   CheckCircle2,
   Menu,
   X,
-  Sun,
-  Moon,
 } from 'lucide-react';
 
 export type NavTab =
@@ -38,12 +36,9 @@ interface NavigationProps {
   currentTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
   portalMode: 'personal' | 'business' | 'admin';
-  onChangePortal: (mode: 'personal' | 'business' | 'admin') => void;
   onOpenSend: () => void;
   onOpenReceive: () => void;
   onOpenAI: () => void;
-  isDark: boolean;
-  onToggleTheme: () => void;
   unreadCount?: number;
 }
 
@@ -51,12 +46,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   currentTab,
   onSelectTab,
   portalMode,
-  onChangePortal,
   onOpenSend,
   onOpenReceive,
   onOpenAI,
-  isDark,
-  onToggleTheme,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
@@ -88,48 +80,7 @@ export const Navigation: React.FC<NavigationProps> = ({
               </div>
             </button>
 
-            {/* Portal Switcher Segmented Control (Minimalist Black & White) */}
-            <div className="hidden md:flex items-center p-0.5 bg-neutral-100 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 rounded-lg text-xs font-medium ml-2">
-              <button
-                onClick={() => {
-                  onChangePortal('personal');
-                  onSelectTab('personal_dashboard');
-                }}
-                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                  portalMode === 'personal'
-                    ? 'bg-white text-neutral-950 shadow-sm font-semibold dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-slate-200'
-                }`}
-              >
-                Personal
-              </button>
-              <button
-                onClick={() => {
-                  onChangePortal('business');
-                  onSelectTab('business_dashboard');
-                }}
-                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                  portalMode === 'business'
-                    ? 'bg-white text-neutral-950 shadow-sm font-semibold dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-slate-200'
-                }`}
-              >
-                Business
-              </button>
-              <button
-                onClick={() => {
-                  onChangePortal('admin');
-                  onSelectTab('admin_dashboard');
-                }}
-                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                  portalMode === 'admin'
-                    ? 'bg-white text-neutral-950 shadow-sm font-semibold dark:bg-neutral-800 dark:text-white'
-                    : 'text-neutral-600 hover:text-neutral-950 dark:text-neutral-400 dark:hover:text-slate-200'
-                }`}
-              >
-                Audit & Security
-              </button>
-            </div>
+
           </div>
 
           {/* Zone 2: Navigation Links (Clean single-line prose) */}
@@ -218,16 +169,6 @@ export const Navigation: React.FC<NavigationProps> = ({
 
           {/* Zone 3: Actions + Theme Switcher + KASH AI Copilot Launch Button */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {/* THEME TOGGLE BUTTON (Light / Dark) */}
-            <button
-              onClick={onToggleTheme}
-              className="p-2 rounded-lg text-neutral-700 hover:text-neutral-950 bg-neutral-100 hover:bg-neutral-200 border border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:text-white transition-all cursor-pointer"
-              title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-              aria-label="Toggle theme"
-            >
-              {isDark ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-neutral-700" />}
-            </button>
-
             <button
               onClick={onOpenSend}
               className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-100 text-neutral-900 border border-neutral-300 dark:bg-neutral-900 dark:hover:bg-neutral-800 dark:border-neutral-800 dark:text-neutral-200 text-xs font-semibold transition-colors cursor-pointer"
@@ -266,124 +207,40 @@ export const Navigation: React.FC<NavigationProps> = ({
         {/* Mobile dropdown drawer */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-4 py-4 space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-800">
-              <span className="text-xs text-neutral-500 dark:text-neutral-400">Portal Mode:</span>
-              <div className="flex gap-1">
-                {(['personal', 'business', 'admin'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      onChangePortal(mode);
-                      onSelectTab(mode === 'personal' ? 'personal_dashboard' : mode === 'business' ? 'business_dashboard' : 'admin_dashboard');
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`px-2.5 py-1 text-xs rounded capitalize font-medium ${
-                      portalMode === mode
-                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-bold'
-                        : 'text-neutral-600 bg-neutral-100 dark:text-neutral-400 dark:bg-neutral-900'
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                onClick={() => { onSelectTab('personal_dashboard'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => { onSelectTab('personal_wallets'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Wallets
-              </button>
-              <button
-                onClick={() => { onSelectTab('personal_transactions'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Transactions
-              </button>
-              <button
-                onClick={() => { onSelectTab('personal_exchange'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Exchange FX
-              </button>
-              <button
-                onClick={() => { onSelectTab('personal_crypto'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Crypto Sim
-              </button>
-              <button
-                onClick={() => { onSelectTab('admin_dashboard'); setMobileMenuOpen(false); }}
-                className="text-left px-3 py-2 rounded bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-200 font-medium"
-              >
-                Security Audit
-              </button>
-            </div>
+              {portalMode === 'personal' && [
+                ['personal_dashboard', 'Overview'], ['personal_wallets', 'Wallets'], ['personal_transactions', 'Transactions'],
+                ['personal_exchange', 'FX Exchange'], ['personal_crypto', 'Crypto simulation'], ['personal_analytics', 'Analytics'],
+              ].map(([tab, label]) => <button key={tab} onClick={() => { onSelectTab(tab as NavTab); setMobileMenuOpen(false); }} className="rounded-xl border border-neutral-800 bg-neutral-900/80 px-3 py-3 text-left font-medium text-neutral-200">{label}</button>)}
+              {portalMode === 'business' && [
+                ['business_dashboard', 'Treasury overview'], ['personal_transactions', 'Payments & payouts'],
+                ['business_team', 'Team & access'], ['business_reconciliation', 'Reconciliation'],
+              ].map(([tab, label]) => <button key={tab} onClick={() => { onSelectTab(tab as NavTab); setMobileMenuOpen(false); }} className="rounded-xl border border-neutral-800 bg-neutral-900/80 px-3 py-3 text-left font-medium text-neutral-200">{label}</button>)}
+              {portalMode === 'admin' && <button onClick={() => { onSelectTab('admin_dashboard'); setMobileMenuOpen(false); }} className="rounded-xl border border-neutral-800 bg-neutral-900/80 px-3 py-3 text-left font-medium text-neutral-200">Security audit</button>}
+            </div>/div>
           </div>
         )}
       </header>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-neutral-950/95 border-t border-neutral-200 dark:border-neutral-800 backdrop-blur-lg px-2 py-2 flex items-center justify-around">
-        <button
-          onClick={() => onSelectTab('personal_dashboard')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-medium ${
-            currentTab === 'personal_dashboard'
-              ? 'text-neutral-950 dark:text-white font-bold'
-              : 'text-neutral-500 dark:text-neutral-400'
-          }`}
-        >
-          <Wallet className="w-5 h-5" />
-          <span>Home</span>
-        </button>
-
-        <button
-          onClick={() => onSelectTab('personal_transactions')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-medium ${
-            currentTab === 'personal_transactions'
-              ? 'text-neutral-950 dark:text-white font-bold'
-              : 'text-neutral-500 dark:text-neutral-400'
-          }`}
-        >
-          <Layers className="w-5 h-5" />
-          <span>Activity</span>
-        </button>
-
-        <button
-          onClick={onOpenSend}
-          className="flex flex-col items-center justify-center -mt-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full w-12 h-12 shadow-lg shadow-blue-500/40 cursor-pointer transition-transform active:scale-95"
-        >
-          <Send className="w-5 h-5" />
-        </button>
-
-        <button
-          onClick={() => onSelectTab('personal_exchange')}
-          className={`flex flex-col items-center gap-1 text-[10px] font-medium ${
-            currentTab === 'personal_exchange'
-              ? 'text-neutral-950 dark:text-white font-bold'
-              : 'text-neutral-500 dark:text-neutral-400'
-          }`}
-        >
-          <ArrowLeftRight className="w-5 h-5" />
-          <span>Convert</span>
-        </button>
-
-        <button
-          onClick={onOpenAI}
-          className="flex flex-col items-center gap-1 text-[10px] font-medium text-neutral-700 dark:text-neutral-300"
-        >
-          <Bot className="w-5 h-5" />
-          <span>KASH AI</span>
-        </button>
-      </nav>
+      {/* Role-specific mobile navigation: never expose another account's workspace. */}
+      {portalMode === 'personal' && <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[.08] bg-[#080a0c]/95 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
+        <button onClick={() => onSelectTab('personal_dashboard')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Wallet className="h-5 w-5"/><span>Home</span></button>
+        <button onClick={() => onSelectTab('personal_transactions')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Layers className="h-5 w-5"/><span>Activity</span></button>
+        <button onClick={onOpenSend} className="flex h-12 w-12 -mt-5 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"><Send className="h-5 w-5"/></button>
+        <button onClick={() => onSelectTab('personal_exchange')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><ArrowLeftRight className="h-5 w-5"/><span>Convert</span></button>
+        <button onClick={onOpenAI} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Bot className="h-5 w-5"/><span>KASH AI</span></button>
+      </nav>}
+      {portalMode === 'business' && <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[.08] bg-[#080a0c]/95 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
+        <button onClick={() => onSelectTab('business_dashboard')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Wallet className="h-5 w-5"/><span>Treasury</span></button>
+        <button onClick={() => onSelectTab('personal_transactions')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Layers className="h-5 w-5"/><span>Payments</span></button>
+        <button onClick={onOpenSend} className="flex h-12 w-12 -mt-5 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg shadow-indigo-500/30"><Send className="h-5 w-5"/></button>
+        <button onClick={() => onSelectTab('business_reconciliation')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><RefreshCw className="h-5 w-5"/><span>Reconcile</span></button>
+        <button onClick={onOpenAI} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Bot className="h-5 w-5"/><span>KASH AI</span></button>
+      </nav>}
+      {portalMode === 'admin' && <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[.08] bg-[#080a0c]/95 backdrop-blur-xl px-2 py-2 flex items-center justify-around">
+        <button onClick={() => onSelectTab('admin_dashboard')} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><ShieldCheck className="h-5 w-5"/><span>Audit</span></button>
+        <button onClick={onOpenAI} className="flex flex-col items-center gap-1 text-[10px] text-neutral-300"><Bot className="h-5 w-5"/><span>KASH AI</span></button>
+      </nav>}
     </>
   );
 };
