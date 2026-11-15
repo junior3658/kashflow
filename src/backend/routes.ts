@@ -21,6 +21,30 @@ import { requireAuth, readCookie } from './auth/middleware';
 
 export const apiRouter = Router();
 
+// Persist domain mutations before sending the HTTP response. SQLite uses a
+// single-row atomic transaction, so a successful response is not sent before
+// the current financial state has been durably committed.
+apiRouter.use((req: Request, res: Response, next: any) => {
+  let committed = false;
+  const commit = () => {
+    if (committed) return;
+    db.persist();
+    committed = true;
+  };
+  const response = res as any;
+  const originalJson = response.json.bind(res);
+  const originalSend = response.send.bind(res);
+  response.json = (body: unknown) => {
+    commit();
+    return originalJson(body);
+  };
+  response.send = (body: unknown) => {
+    commit();
+    return originalSend(body);
+  };
+  next();
+});
+
 // Public authentication endpoints. A small per-process throttle is a prototype
 // safeguard; production deployment must also enforce edge/IP rate limits.
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
