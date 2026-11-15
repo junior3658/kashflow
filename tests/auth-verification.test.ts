@@ -81,6 +81,76 @@ export async function testAuthVerificationConcurrency() {
     }
     console.log('✓ Concurrent invalid codes cannot exceed the five-attempt limit.');
 
+    const previousFetch = globalThis.fetch;
+    const previousResendApiKey = process.env.RESEND_API_KEY;
+    const previousResendFrom = process.env.RESEND_FROM_EMAIL;
+    const previousAppUrl = process.env.APP_URL;
+    process.env.RESEND_API_KEY = 're_test_only';
+    process.env.RESEND_FROM_EMAIL = 'KASHFLOW <test@example.test>';
+    process.env.APP_URL = 'http://localhost:3000';
+
+    try {
+      const { resendVerification } = await import('../src/backend/auth/store');
+      const resendUserId = 'usr_auth_resend_concurrency';
+      const resendEmail = 'auth-resend-concurrency@example.test';
+      authDb.prepare(
+        'INSERT INTO auth_users(id,email,full_name,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)'
+      ).run(resendUserId, resendEmail, 'Resend Concurrency Test', 'unused', 'unused', now);
+
+      globalThis.fetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'resend-test-message' }),
+      } as Response);
+
+      await Promise.all([
+        resendVerification(resendEmail),
+        resendVerification(resendEmail),
+      ]);
+      const issuedCodes = (authDb.prepare(
+        'SELECT COUNT(*) AS count FROM verification_codes WHERE user_id = ? AND consumed_at IS NULL'
+      ).get(resendUserId) as { count: number }).count;
+      if (issuedCodes !== 1) {
+        throw new Error(`Concurrent resend requests should issue one active code; database recorded ${issuedCodes}.`);
+      }
+      console.log('✓ Concurrent resend requests issue only one active verification code.');
+
+      const failedDeliveryUserId = 'usr_auth_resend_delivery_failure';
+      const failedDeliveryEmail = 'auth-resend-failure@example.test';
+      authDb.prepare(
+        'INSERT INTO auth_users(id,email,full_name,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)'
+      ).run(failedDeliveryUserId, failedDeliveryEmail, 'Resend Delivery Failure Test', 'unused', 'unused', now);
+
+      globalThis.fetch = async () => ({
+        ok: false,
+        status: 503,
+        json: async () => ({ message: 'temporary provider failure' }),
+      } as Response);
+
+      let deliveryFailureObserved = false;
+      try {
+        await resendVerification(failedDeliveryEmail);
+      } catch {
+        deliveryFailureObserved = true;
+      }
+      if (!deliveryFailureObserved) throw new Error('A failed email delivery was not surfaced to the caller.');
+      const undeliveredCodes = (authDb.prepare(
+        'SELECT COUNT(*) AS count FROM verification_codes WHERE user_id = ? AND consumed_at IS NULL'
+      ).get(failedDeliveryUserId) as { count: number }).count;
+      if (undeliveredCodes !== 0) {
+        throw new Error('A verification code remained usable after email delivery failed.');
+      }
+      console.log('✓ Failed email delivery removes the undelivered verification code.');
+    } finally {
+      globalThis.fetch = previousFetch;
+      if (previousResendApiKey === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = previousResendApiKey;
+      if (previousResendFrom === undefined) delete process.env.RESEND_FROM_EMAIL;
+      else process.env.RESEND_FROM_EMAIL = previousResendFrom;
+      if (previousAppUrl === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = previousAppUrl;
+    }
+
     authDb.close();
   } finally {
     if (previousDatabasePath === undefined) delete process.env.AUTH_DATABASE_PATH;
