@@ -60,3 +60,35 @@
 @keyframes kashflow-cube-spin { 0% { transform: rotateX(-17deg) rotateY(0deg); } 100% { transform: rotateX(343deg) rotateY(360deg); } }
 @media (prefers-reduced-motion: reduce) { .payment-cube { animation: none; transform: rotateX(-17deg) rotateY(-24deg); } }
 @media (max-width: 480px) { .payment-cube { width: 190px; height: 190px; } .cube-front { transform: rotateY(0deg) translateZ(95px); } .cube-right { transform: rotateY(90deg) translateZ(95px); } .cube-back { transform: rotateY(180deg) translateZ(95px); } .cube-left { transform: rotateY(-90deg) translateZ(95px); } .cube-top { transform: rotateX(90deg) translateZ(95px); } .cube-bottom { transform: rotateX(-90deg) translateZ(95px); } .cube-face { border-radius: 19px; gap: 9px; } }
+
+
+/* KASHFLOW application-wide visual foundation: the authenticated product shares the landing page's dark identity. */
+html.dark {
+  color-scheme: dark;
+  background: #050607;
+}
+html.dark body {
+  min-height: 100vh;
+  background: #050607;
+  color: #e5e7eb;
+}
+html.dark #root {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(99,102,241,.075), transparent 34rem),
+    radial-gradient(ellipse at 88% 18%, rgba(56,189,248,.035), transparent 30rem),
+    #050607;
+}
+html.dark ::selection {
+  color: #fff;
+  background: rgba(99,102,241,.42);
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color-scheme: dark;
+}
+html.dark button,
+html.dark a {
+  -webkit-tap-highlight-color: transparent;
+}
