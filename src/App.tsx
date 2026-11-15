@@ -37,35 +37,14 @@ export default function App() {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
-  // Theme state: default is LIGHT (white dominates), supports dual theme (Light / Dark)
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('kashflow_theme') === 'dark';
-    }
-    return false;
-  });
-
-  const toggleTheme = () => {
-    setIsDark((prev) => {
-      const next = !prev;
-      if (next) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('kashflow_theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('kashflow_theme', 'light');
-      }
-      return next;
-    });
-  };
+  // KASHFLOW uses one consistent near-black workspace theme across every authenticated screen.
+  const isDark = true;
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
+    document.documentElement.classList.add('dark');
+    document.documentElement.style.colorScheme = 'dark';
+    localStorage.setItem('kashflow_theme', 'dark');
+  }, []);
 
   useEffect(() => {
     fetch('/api/v1/auth/me', { credentials: 'include' })
@@ -77,8 +56,8 @@ export default function App() {
         }
         const data = await response.json();
         setCurrentUserRole(data.user?.role ?? 'PERSONAL_USER');
-        setPortalMode(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business' : 'personal');
-        setCurrentTab(data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business_dashboard' : 'personal_dashboard');
+        setPortalMode(data.user?.role === 'PLATFORM_ADMIN' ? 'admin' : data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business' : 'personal');
+        setCurrentTab(data.user?.role === 'PLATFORM_ADMIN' ? 'admin_dashboard' : data.user?.role === 'BUSINESS_OWNER' || data.user?.role === 'BUSINESS_ADMIN' || data.user?.role === 'BUSINESS_EMPLOYEE' ? 'business_dashboard' : 'personal_dashboard');
         setAuthStatus('authenticated');
       })
       .catch(() => {
@@ -90,18 +69,23 @@ export default function App() {
   // Fetch Wallets & Transactions
   const refreshData = async () => {
     try {
-      const [wPersonalRes, wBusinessRes, txRes] = await Promise.all([
-        fetch('/api/v1/wallets?type=PERSONAL'),
-        fetch('/api/v1/wallets?type=BUSINESS'),
-        fetch('/api/v1/transactions'),
+      const walletType = portalMode === 'business' ? 'BUSINESS' : 'PERSONAL';
+      const [walletRes, txRes] = await Promise.all([
+        fetch(`/api/v1/wallets?type=${walletType}`, { credentials: 'include' }),
+        fetch('/api/v1/transactions', { credentials: 'include' }),
       ]);
 
-      const wPersonalData = await wPersonalRes.json();
-      const wBusinessData = await wBusinessRes.json();
+      if (!walletRes.ok || !txRes.ok) throw new Error('Unable to load the authenticated workspace data.');
+      const walletData = await walletRes.json();
       const txData = await txRes.json();
 
-      setWallets(wPersonalData.wallets || []);
-      setBusinessWallets(wBusinessData.wallets || []);
+      if (portalMode === 'business') {
+        setBusinessWallets(walletData.wallets || []);
+        setWallets([]);
+      } else {
+        setWallets(walletData.wallets || []);
+        setBusinessWallets([]);
+      }
       setTransactions(txData.transactions || []);
     } catch (err) {
       console.error('Failed to load application data:', err);
@@ -117,7 +101,7 @@ export default function App() {
   }
   if (authStatus === 'guest') {
     if (authView === 'landing') return <LandingPage onSignIn={() => setAuthView('login')} onGetStarted={() => setAuthView('register')} />;
-    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={async () => { const response = await fetch('/api/v1/auth/me', { credentials: 'include' }); const data = response.ok ? await response.json() : null; const role = data?.user?.role ?? 'PERSONAL_USER'; const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(role); setCurrentUserRole(role); setPortalMode(isBusiness ? 'business' : 'personal'); setCurrentTab(isBusiness ? 'business_dashboard' : 'personal_dashboard'); setAuthStatus('authenticated'); setAuthView('landing'); }} />;
+    return <AuthPage initialMode={authView} onBack={() => setAuthView('landing')} onAuthenticated={async () => { const response = await fetch('/api/v1/auth/me', { credentials: 'include' }); const data = response.ok ? await response.json() : null; const role = data?.user?.role ?? 'PERSONAL_USER'; const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(role); const isAdmin = role === 'PLATFORM_ADMIN'; setCurrentUserRole(role); setPortalMode(isAdmin ? 'admin' : isBusiness ? 'business' : 'personal'); setCurrentTab(isAdmin ? 'admin_dashboard' : isBusiness ? 'business_dashboard' : 'personal_dashboard'); setAuthStatus('authenticated'); setAuthView('landing'); }} />;
   }
 
   return (
@@ -125,23 +109,22 @@ export default function App() {
       {/* Universal Navigation with Theme Switcher */}
       <Navigation
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        portalMode={portalMode}
-        onChangePortal={(mode) => {
-          setPortalMode(mode);
-          if (mode === 'personal') setCurrentTab('personal_dashboard');
-          if (mode === 'business') setCurrentTab('business_dashboard');
-          if (mode === 'admin') setCurrentTab('admin_dashboard');
+        onSelectTab={(tab) => {
+          const isBusiness = ['BUSINESS_OWNER', 'BUSINESS_ADMIN', 'BUSINESS_EMPLOYEE'].includes(currentUserRole || '');
+          const isAdmin = currentUserRole === 'PLATFORM_ADMIN';
+          const personalTabs: NavTab[] = ['personal_dashboard', 'personal_wallets', 'personal_transactions', 'personal_exchange', 'personal_crypto', 'personal_analytics', 'kash_ai'];
+          const businessTabs: NavTab[] = ['business_dashboard', 'business_team', 'business_reconciliation', 'personal_transactions', 'kash_ai'];
+          const allowed = isAdmin ? ['admin_dashboard', 'kash_ai'] : isBusiness ? businessTabs : personalTabs;
+          if (allowed.includes(tab)) setCurrentTab(tab);
         }}
+        portalMode={portalMode}
         onOpenSend={() => setIsSendOpen(true)}
         onOpenReceive={() => setIsReceiveOpen(true)}
         onOpenAI={() => setIsAIOpen(true)}
-        isDark={isDark}
-        onToggleTheme={toggleTheme}
       />
 
       {/* Main Viewport Container (1440px max width desktop baseline) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 sm:pb-8">
         {currentTab === 'personal_dashboard' && (
           <PersonalDashboard
             wallets={wallets}
