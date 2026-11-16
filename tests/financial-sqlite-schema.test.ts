@@ -136,7 +136,7 @@ export function testFinancialSqliteSchema() {
     );
     insertIdempotency.run('user-b', 'request-1', 'b'.repeat(64), 'tx-idem-other', now);
     assert.throws(
-      () => insertIdempotency.run('user-a', 'request-1', 'c'.repeat(64), 'tx-idem-a', now),
+      () => sql.prepare("UPDATE idempotency_keys SET request_sha256 = ? WHERE user_id = 'user-a' AND idempotency_key = 'request-1'").run('c'.repeat(64)),
       /immutable/,
     );
     console.log('✓ Idempotency keys are unique per user and immutable.');
