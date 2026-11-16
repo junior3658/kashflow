@@ -59,6 +59,15 @@ export function testFinancialSqliteSchema() {
     );
     console.log('✓ SQL tenant trigger rejects another user wallet.');
 
+    addTransaction({ id: 'tx-overdraw', destinationWalletId: null, amount: 10001 });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-overdraw'").run();
+    assert.throws(
+      () => sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-overdraw', 'wallet-a', 'USD', 10001, 'ACTIVE', ?, ?)").run(now, now),
+      /insufficient available wallet balance/,
+    );
+    sql.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = 'tx-overdraw'").run();
+    console.log('✓ SQLite refuses reservations above the available wallet balance.');
+
     addTransaction({ id: 'tx-internal' });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-internal'").run();
     sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-internal', 'wallet-a', 'USD', 500, 'ACTIVE', ?, ?)").run(now, now);
