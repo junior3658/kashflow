@@ -171,6 +171,80 @@ CREATE TABLE IF NOT EXISTS provider_events (
 
 CREATE INDEX IF NOT EXISTS idx_provider_events_transaction ON provider_events(transaction_id, provider);
 
+CREATE TRIGGER IF NOT EXISTS trg_wallet_identity_immutable
+BEFORE UPDATE OF owner_type, owner_id, wallet_type, currency ON wallets
+BEGIN
+  SELECT RAISE(ABORT, 'wallet ownership and currency are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_account_identity_immutable
+BEFORE UPDATE OF code, name, account_type, currency, wallet_id ON ledger_accounts
+BEGIN
+  SELECT RAISE(ABORT, 'ledger account identity is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_idempotency_keys_no_update
+BEFORE UPDATE ON idempotency_keys
+BEGIN
+  SELECT RAISE(ABORT, 'idempotency records are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_idempotency_keys_no_delete
+BEFORE DELETE ON idempotency_keys
+BEGIN
+  SELECT RAISE(ABORT, 'idempotency records are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_transactions_provider_reference_immutable
+BEFORE UPDATE OF provider_reference ON transactions
+WHEN OLD.provider_reference IS NOT NULL AND NEW.provider_reference <> OLD.provider_reference
+BEGIN
+  SELECT RAISE(ABORT, 'provider reference is immutable once assigned');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_provider_events_initial_state
+BEFORE INSERT ON provider_events
+WHEN NEW.verification_status <> 'UNVERIFIED' OR NEW.reconciliation_status <> 'PENDING'
+BEGIN
+  SELECT RAISE(ABORT, 'provider events must start unverified and unreconciled');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_provider_events_verification_monotonic
+BEFORE UPDATE OF verification_status ON provider_events
+WHEN OLD.verification_status IN ('VERIFIED', 'REJECTED')
+  AND NEW.verification_status <> OLD.verification_status
+BEGIN
+  SELECT RAISE(ABORT, 'provider verification result is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_provider_events_reconciliation_monotonic
+BEFORE UPDATE OF reconciliation_status ON provider_events
+WHEN OLD.reconciliation_status IN ('MATCHED', 'MISMATCHED')
+  AND NEW.reconciliation_status <> OLD.reconciliation_status
+BEGIN
+  SELECT RAISE(ABORT, 'provider reconciliation result is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_batches_insert_unposted
+BEFORE INSERT ON ledger_batches
+WHEN NEW.posted_at IS NOT NULL
+BEGIN
+  SELECT RAISE(ABORT, 'ledger batches must be posted through the validated transition');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_batches_identity_immutable
+BEFORE UPDATE OF id, transaction_id, batch_type, currency, total_debits_minor,
+  total_credits_minor, reversal_of_batch_id, created_at ON ledger_batches
+BEGIN
+  SELECT RAISE(ABORT, 'ledger batch identity and totals are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_reservations_identity_immutable
+BEFORE UPDATE OF transaction_id, wallet_id, currency, amount_minor, created_at ON wallet_reservations
+BEGIN
+  SELECT RAISE(ABORT, 'wallet reservation identity is immutable');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_transactions_validate_tenant_insert
 BEFORE INSERT ON transactions
 BEGIN
