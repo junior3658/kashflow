@@ -331,6 +331,15 @@ BEGIN
       AND t.currency = NEW.currency
       AND NEW.amount_minor = t.amount_minor + t.fee_minor
   ) THEN RAISE(ABORT, 'reservation must match a pending transaction source and total') END;
+
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM wallets w
+    WHERE w.id = NEW.wallet_id
+      AND w.currency = NEW.currency
+      AND w.status = 'ACTIVE'
+      AND w.internal_balance_minor - w.pending_debits_minor >= NEW.amount_minor
+      AND w.pending_debits_minor <= 9007199254740991 - NEW.amount_minor
+  ) THEN RAISE(ABORT, 'insufficient available wallet balance for reservation') END;
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_reservations_apply_insert
@@ -428,6 +437,13 @@ BEGIN
       AND original.batch_type = 'POSTING'
       AND original.posted_at IS NOT NULL
   ) THEN RAISE(ABORT, 'reversal must reference the posted original batch') END;
+
+  SELECT CASE WHEN NEW.batch_type = 'POSTING' AND (
+    SELECT provider FROM transactions WHERE id = NEW.transaction_id
+  ) = 'INTERNAL' AND NOT EXISTS (
+    SELECT 1 FROM wallet_reservations r
+    WHERE r.transaction_id = NEW.transaction_id AND r.status = 'ACTIVE'
+  ) THEN RAISE(ABORT, 'internal posting requires an active wallet reservation') END;
 
   SELECT CASE WHEN (
     SELECT provider FROM transactions WHERE id = NEW.transaction_id
