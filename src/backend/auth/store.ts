@@ -165,8 +165,10 @@ async function sendCode(user: any) {
   const codeHash = await passwordHash(code, id);
 
   // BEGIN IMMEDIATE serializes concurrent resend attempts across processes. The
-  // cooldown check and insertion therefore form one atomic operation.
-  const issueCode = sql.transaction.immediate(() => {
+  // installed better-sqlite3 typings do not expose Transaction.immediate(), so use
+  // the equivalent SQL transaction mode explicitly and keep rollback deterministic.
+  sql.exec('BEGIN IMMEDIATE');
+  try {
     const now = Date.now();
     const last = sql.prepare(
       'SELECT created_at FROM verification_codes WHERE user_id = ? ORDER BY created_at DESC LIMIT 1'
@@ -183,8 +185,11 @@ async function sendCode(user: any) {
     sql.prepare(
       'INSERT INTO verification_codes(id, user_id, code_hash, expires_at, created_at) VALUES(?,?,?,?,?)'
     ).run(id, user.id, codeHash, now + CODE_MS, now);
-  });
-  issueCode();
+    sql.exec('COMMIT');
+  } catch (error) {
+    sql.exec('ROLLBACK');
+    throw error;
+  }
 
   try {
     await sendVerificationEmail({
