@@ -6,7 +6,7 @@ export type FinancialDatabase = InstanceType<typeof Database>;
 
 export const FINANCIAL_SCHEMA_VERSION = 1;
 
-const schema = String.raw\`
+const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,
   applied_at TEXT NOT NULL
@@ -497,7 +497,7 @@ BEGIN
     AND status = 'ACTIVE'
     AND NEW.batch_type = 'POSTING';
 END;
-\`;
+`;
 
 export function openFinancialDatabase(
   filename = process.env.FINANCIAL_DATABASE_PATH || 'data/kashflow-financial.sqlite',
@@ -515,7 +515,7 @@ export function openFinancialDatabase(
   if (currentVersion > FINANCIAL_SCHEMA_VERSION) {
     sql.close();
     throw new Error(
-      \`Financial database schema version \${currentVersion} is newer than this application supports (\${FINANCIAL_SCHEMA_VERSION}).\`,
+      `Financial database schema version ${currentVersion} is newer than this application supports (${FINANCIAL_SCHEMA_VERSION}).`,
     );
   }
 
@@ -526,7 +526,7 @@ export function openFinancialDatabase(
       FINANCIAL_SCHEMA_VERSION,
       new Date().toISOString(),
     );
-    sql.exec(\`PRAGMA user_version = \${FINANCIAL_SCHEMA_VERSION}\`);
+    sql.exec(`PRAGMA user_version = ${FINANCIAL_SCHEMA_VERSION}`);
     sql.exec('COMMIT');
   } catch (error) {
     sql.exec('ROLLBACK');
