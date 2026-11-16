@@ -303,7 +303,7 @@ Run the repository test command:
 npm test
 ```
 
-The test runner includes ledger, AI-agent and security-scenario test modules. These tests exercise application logic and simulated scenarios; they do not certify the security of a deployed financial service or prove that external providers are connected.
+The test runner includes ledger, authentication-concurrency, SQLite-schema, AI-agent and security-scenario test modules. These tests exercise application logic and database constraints; they do not certify the security of a deployed financial service or prove that external providers are connected. The new SQLite financial schema is a foundation only: current wallet, transaction and ledger services still use in-memory maps.
 
 Run the TypeScript check:
 
@@ -378,6 +378,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the current security design notes.
 - [x] AI agent modules and conversational interface
 - [x] PayPal and Shwary adapter interfaces
 - [x] Currency exchange and crypto paper-trading modules
+- [x] Add versioned SQLite financial schema and database-invariant tests (service cutover still pending)
 - [ ] Replace in-memory financial-domain storage with durable, atomic SQLite persistence
 - [x] Implement email/password authentication, email verification and session authorization (feature branch; financial data remains in-memory)
 - [ ] Integrate and verify PayPal Sandbox REST API end to end (currently disabled)
@@ -391,6 +392,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the current security design notes.
 - [Authentication implementation and limitations](docs/AUTHENTICATION.md)
 - [System architecture](docs/ARCHITECTURE.md)
 - [Financial core and ledger](docs/FINANCIAL_CORE.md)
+- [SQLite financial schema foundation and migration boundary](docs/FINANCIAL_SQLITE_SCHEMA.md)
 - [AI architecture](docs/AI_ARCHITECTURE.md)
 - [Security notes](docs/SECURITY.md)
 - [PayPal integration plan](docs/PAYPAL_INTEGRATION.md)
