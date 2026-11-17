@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS organization_memberships (
   user_id TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('OWNER', 'ADMIN', 'EMPLOYEE')),
   status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REVOKED')),
+  can_transact INTEGER NOT NULL DEFAULT 0 CHECK (can_transact IN (0, 1)),
   created_at TEXT NOT NULL,
   PRIMARY KEY (organization_id, user_id)
 );
@@ -303,6 +304,7 @@ BEGIN
     WHERE m.organization_id = NEW.org_id
       AND m.user_id = NEW.user_id
       AND m.status = 'ACTIVE'
+      AND m.can_transact = 1
       AND o.status = 'ACTIVE'
   ) THEN RAISE(ABORT, 'transaction user lacks active organization membership') END;
 
