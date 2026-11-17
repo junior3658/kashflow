@@ -1,4 +1,4 @@
-# SQLite financial schema foundation
+# SQLite financial schema foundation (version 2)
 
 ## Scope of this change
 
@@ -7,6 +7,8 @@ This change introduces version 1 of the financial SQLite schema and automated da
 Set FINANCIAL_DATABASE_PATH to select the local database file. The default is data/kashflow-financial.sqlite; database files are ignored by Git.
 
 ## Schema guarantees
+
+- Organizations and user memberships are represented in SQLite. An organization wallet requires an active organization, and every transaction carrying an `org_id` must be created by an active member of that organization. Revoked memberships and suspended organizations cannot authorize new transactions.
 
 - Wallet ownership is explicit: USER or ORGANIZATION, with owner-scoped indexes and immutable ownership/currency fields.
 - Amounts are integer minor units and constrained to JavaScript's safe-integer range.
@@ -26,6 +28,8 @@ For a non-INTERNAL transaction, the schema refuses to post a settlement batch un
 These database constraints do not implement cryptographic webhook verification or provider reconciliation. Those application services still need official Shwary/PayPal event specifications and must set the verification/reconciliation fields only after independently validating signatures, transaction identity, amount, currency and provider status. HTTP 2xx responses and LLM output remain insufficient evidence.
 
 ## Migration boundary and demo data
+
+The additive version 2 migration backfills organization identities from existing organization-owned wallets, but intentionally does **not** invent user memberships. Existing organizations must have their legitimate memberships provisioned from the authoritative organization/authentication workflow before organization transactions can be created. The authentication database and financial database are still separate; that provisioning bridge is not yet integrated into the application.
 
 The current db.ts seeds illustrative balances and historical transactions, including provider-labelled records that have no verifiable provider-event evidence. **Those seed records must not be copied into the persistent financial database as real settled funds.** The eventual cutover should start with a clean financial database or explicitly tag imported fixtures as simulated, after a deliberate migration decision. No automatic import is performed by this schema initializer.
 
