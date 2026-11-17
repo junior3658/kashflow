@@ -4,13 +4,31 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 1;
+export const FINANCIAL_SCHEMA_VERSION = 2;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version INTEGER PRIMARY KEY,
   applied_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS financial_organizations (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL CHECK (status IN ('ACTIVE', 'SUSPENDED')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS organization_memberships (
+  organization_id TEXT NOT NULL REFERENCES financial_organizations(id),
+  user_id TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('OWNER', 'ADMIN', 'EMPLOYEE')),
+  status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'REVOKED')),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (organization_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_organization_memberships_user
+  ON organization_memberships(user_id, status);
 
 CREATE TABLE IF NOT EXISTS wallets (
   id TEXT PRIMARY KEY,
@@ -171,6 +189,34 @@ CREATE TABLE IF NOT EXISTS provider_events (
 
 CREATE INDEX IF NOT EXISTS idx_provider_events_transaction ON provider_events(transaction_id, provider);
 
+-- Additive v2 migration: retain legacy organization wallet identities, but do not
+-- invent memberships. Existing organizations must be explicitly provisioned.
+INSERT OR IGNORE INTO financial_organizations (id, status, created_at)
+SELECT owner_id, 'ACTIVE', MIN(created_at)
+FROM wallets
+WHERE owner_type = 'ORGANIZATION'
+GROUP BY owner_id;
+
+CREATE TRIGGER IF NOT EXISTS trg_organization_membership_validate_insert
+BEFORE INSERT ON organization_memberships
+WHEN NOT EXISTS (
+  SELECT 1 FROM financial_organizations
+  WHERE id = NEW.organization_id AND status = 'ACTIVE'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'organization must exist and be active before membership provisioning');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_wallet_organization_owner_exists
+BEFORE INSERT ON wallets
+WHEN NEW.owner_type = 'ORGANIZATION' AND NOT EXISTS (
+  SELECT 1 FROM financial_organizations
+  WHERE id = NEW.owner_id AND status = 'ACTIVE'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'organization wallet requires an active organization');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_wallet_identity_immutable
 BEFORE UPDATE OF owner_type, owner_id, wallet_type, currency ON wallets
 BEGIN
@@ -245,9 +291,21 @@ BEGIN
   SELECT RAISE(ABORT, 'wallet reservation identity is immutable');
 END;
 
+DROP TRIGGER IF EXISTS trg_transactions_validate_tenant_insert;
+
 CREATE TRIGGER IF NOT EXISTS trg_transactions_validate_tenant_insert
 BEFORE INSERT ON transactions
 BEGIN
+  SELECT CASE WHEN NEW.org_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1
+    FROM organization_memberships m
+    JOIN financial_organizations o ON o.id = m.organization_id
+    WHERE m.organization_id = NEW.org_id
+      AND m.user_id = NEW.user_id
+      AND m.status = 'ACTIVE'
+      AND o.status = 'ACTIVE'
+  ) THEN RAISE(ABORT, 'transaction user lacks active organization membership') END;
+
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM wallets w
     WHERE w.id = NEW.source_wallet_id
