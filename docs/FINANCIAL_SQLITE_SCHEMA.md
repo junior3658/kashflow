@@ -2,13 +2,13 @@
 
 ## Scope of this change
 
-This change introduces version 1 of the financial SQLite schema and automated database-invariant tests. It is a **foundation only**: the existing WalletService, LedgerEngine, TransactionEngine and API routes still use the in-memory KashflowDatabase maps. No production data has been moved and no financial service has switched to this database yet.
+This change introduces version 2 of the financial SQLite schema and automated database-invariant tests. It is a **foundation only**: the existing WalletService, LedgerEngine, TransactionEngine and API routes still use the in-memory KashflowDatabase maps. No production data has been moved and no financial service has switched to this database yet.
 
 Set FINANCIAL_DATABASE_PATH to select the local database file. The default is data/kashflow-financial.sqlite; database files are ignored by Git.
 
 ## Schema guarantees
 
-- Organizations and user memberships are represented in SQLite. An organization wallet requires an active organization, and every transaction carrying an `org_id` must be created by an active member of that organization. Revoked memberships and suspended organizations cannot authorize new transactions.
+- Organizations and user memberships are represented in SQLite. An organization wallet requires an active organization, and every transaction carrying an `org_id` must be created by an active member with the explicit `can_transact` permission. Membership role alone does not grant transaction authority; revoked memberships and suspended organizations cannot authorize new transactions.
 
 - Wallet ownership is explicit: USER or ORGANIZATION, with owner-scoped indexes and immutable ownership/currency fields.
 - Amounts are integer minor units and constrained to JavaScript's safe-integer range.
