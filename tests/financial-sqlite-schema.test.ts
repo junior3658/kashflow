@@ -18,14 +18,16 @@ export function testFinancialSqliteSchema() {
     id: string;
     userId?: string;
     provider?: 'INTERNAL' | 'PAYPAL' | 'SHWARY';
+    orgId?: string;
     sourceWalletId?: string;
     destinationWalletId?: string | null;
     amount?: number;
     fee?: number;
-  }) => sql.prepare("INSERT INTO transactions (id, user_id, transaction_type, status, source_wallet_id, destination_wallet_id, amount_minor, fee_minor, currency, provider, description, created_at, updated_at) VALUES (?, ?, 'TRANSFER', 'CREATED', ?, ?, ?, ?, 'USD', ?, ?, ?, ?)")
+  }) => sql.prepare("INSERT INTO transactions (id, user_id, org_id, transaction_type, status, source_wallet_id, destination_wallet_id, amount_minor, fee_minor, currency, provider, description, created_at, updated_at) VALUES (?, ?, ?, 'TRANSFER', 'CREATED', ?, ?, ?, ?, 'USD', ?, ?, ?, ?)")
     .run(
       input.id,
       input.userId || 'user-a',
+      input.orgId || null,
       input.sourceWalletId || 'wallet-a',
       input.destinationWalletId === undefined ? 'wallet-b' : input.destinationWalletId,
       input.amount ?? 500,
@@ -52,6 +54,25 @@ export function testFinancialSqliteSchema() {
     addAccount('account-wallet-b', '2010-B', 'LIABILITY', 'wallet-b', 0);
     addAccount('account-wallet-other', '2010-C', 'LIABILITY', 'wallet-other', 10000);
     addAccount('account-cash', '1010', 'ASSET', null, 100000);
+
+    sql.prepare('INSERT INTO financial_organizations(id, status, created_at) VALUES(?, ?, ?)').run('org-a', 'ACTIVE', now);
+    sql.prepare('INSERT INTO organization_memberships(organization_id, user_id, role, status, created_at) VALUES(?, ?, ?, ?, ?)')
+      .run('org-a', 'user-a', 'OWNER', 'ACTIVE', now);
+    sql.prepare("INSERT INTO wallets (id, owner_type, owner_id, wallet_type, currency, name, internal_balance_minor, created_at, updated_at) VALUES ('wallet-org', 'ORGANIZATION', 'org-a', 'BUSINESS', 'USD', 'Org wallet', 10000, ?, ?)")
+      .run(now, now);
+    addAccount('account-wallet-org', '2010-ORG', 'LIABILITY', 'wallet-org', 10000);
+
+    assert.throws(
+      () => addTransaction({ id: 'tx-org-impersonation', userId: 'user-b', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null }),
+      /active organization membership/,
+    );
+    addTransaction({ id: 'tx-org-member', userId: 'user-a', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null });
+    sql.prepare("UPDATE organization_memberships SET status = 'REVOKED' WHERE organization_id = 'org-a' AND user_id = 'user-a'").run();
+    assert.throws(
+      () => addTransaction({ id: 'tx-org-revoked', userId: 'user-a', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null }),
+      /active organization membership/,
+    );
+    console.log('✓ Organization wallets require an active, non-forgeable membership for each transaction.');
 
     assert.throws(
       () => addTransaction({ id: 'tx-cross-tenant', sourceWalletId: 'wallet-other' }),
