@@ -56,8 +56,8 @@ export function testFinancialSqliteSchema() {
     addAccount('account-cash', '1010', 'ASSET', null, 100000);
 
     sql.prepare('INSERT INTO financial_organizations(id, status, created_at) VALUES(?, ?, ?)').run('org-a', 'ACTIVE', now);
-    sql.prepare('INSERT INTO organization_memberships(organization_id, user_id, role, status, created_at) VALUES(?, ?, ?, ?, ?)')
-      .run('org-a', 'user-a', 'OWNER', 'ACTIVE', now);
+    sql.prepare('INSERT INTO organization_memberships(organization_id, user_id, role, status, can_transact, created_at) VALUES(?, ?, ?, ?, ?, ?)')
+      .run('org-a', 'user-a', 'OWNER', 'ACTIVE', 1, now);
     sql.prepare("INSERT INTO wallets (id, owner_type, owner_id, wallet_type, currency, name, internal_balance_minor, created_at, updated_at) VALUES ('wallet-org', 'ORGANIZATION', 'org-a', 'BUSINESS', 'USD', 'Org wallet', 10000, ?, ?)")
       .run(now, now);
     addAccount('account-wallet-org', '2010-ORG', 'LIABILITY', 'wallet-org', 10000);
@@ -67,12 +67,19 @@ export function testFinancialSqliteSchema() {
       /active organization membership/,
     );
     addTransaction({ id: 'tx-org-member', userId: 'user-a', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null });
+    sql.prepare("INSERT INTO organization_memberships(organization_id, user_id, role, status, can_transact, created_at) VALUES('org-a', 'user-c', 'EMPLOYEE', 'ACTIVE', 0, ?)").run(now);
+    assert.throws(
+      () => addTransaction({ id: 'tx-org-employee-denied', userId: 'user-c', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null }),
+      /active organization membership/,
+    );
+    sql.prepare("UPDATE organization_memberships SET can_transact = 1 WHERE organization_id = 'org-a' AND user_id = 'user-c'").run();
+    addTransaction({ id: 'tx-org-employee-authorized', userId: 'user-c', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null });
     sql.prepare("UPDATE organization_memberships SET status = 'REVOKED' WHERE organization_id = 'org-a' AND user_id = 'user-a'").run();
     assert.throws(
       () => addTransaction({ id: 'tx-org-revoked', userId: 'user-a', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null }),
       /active organization membership/,
     );
-    console.log('✓ Organization wallets require an active, non-forgeable membership for each transaction.');
+    console.log('✓ Organization wallets require active membership and explicit transaction permission.');
 
     assert.throws(
       () => addTransaction({ id: 'tx-cross-tenant', sourceWalletId: 'wallet-other' }),
