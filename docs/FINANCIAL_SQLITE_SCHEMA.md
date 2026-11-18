@@ -1,4 +1,4 @@
-# SQLite financial schema foundation (version 2)
+# SQLite financial schema foundation (version 3)
 
 ## Scope of this change
 
@@ -18,14 +18,19 @@ Set FINANCIAL_DATABASE_PATH to select the local database file. The default is da
 - Idempotency keys are unique per user and immutable.
 - Wallet reservations are linked to a pending transaction, update the pending-debit projection, and are consumed only after a posted batch or released on failure/cancellation.
 - Ledger batches declare equal debit and credit totals. Before posting, SQLite checks the actual entries, currency, transaction state and (for external providers) verified plus reconciled provider evidence.
-- Posted ledger entries and batches cannot be edited or deleted. Reversals are separate batches referencing the original posting.
+- Posted ledger entries and batches cannot be edited or deleted. Reversals are separate batches referencing the original posting and must contain the exact inverse multiset of original account/currency/amount lines; partial or altered reversals are rejected.
+- Idempotency records must use the same user identity as their referenced transaction.
 - Wallet and ledger-account balance projections are updated by the validated posting trigger, not by editing historical entries.
 
 ## Provider settlement boundary
 
-For a non-INTERNAL transaction, the schema refuses to post a settlement batch unless a provider event for the same transaction/provider is marked VERIFIED and MATCHED. Events must be inserted as UNVERIFIED / PENDING; their payload hash and identity are immutable, and terminal verification/reconciliation decisions cannot be downgraded.
+For a non-INTERNAL transaction, the schema refuses to post a settlement batch unless a provider event for the same transaction/provider is marked VERIFIED and MATCHED, and its normalized confirmed amount and currency exactly match the immutable transaction intent. Events must be inserted as UNVERIFIED / PENDING with a positive integer amount, currency and normalized status (`PENDING`, `CONFIRMED`, `FAILED` or `CANCELLED`). The evidence fields, payload hash and identity are immutable, and terminal verification/reconciliation decisions cannot be downgraded. A `MATCHED` event must be VERIFIED, normalized as CONFIRMED, and match the transaction amount and currency.
 
 These database constraints do not implement cryptographic webhook verification or provider reconciliation. Those application services still need official Shwary/PayPal event specifications and must set the verification/reconciliation fields only after independently validating signatures, transaction identity, amount, currency and provider status. HTTP 2xx responses and LLM output remain insufficient evidence.
+
+## Version 3 migration
+
+Version 3 adds normalized amount, currency and status evidence to provider events. Existing v2 event rows are not backfilled or trusted because their original payloads are not independently verified. A legacy event without the new evidence cannot authorize settlement.
 
 ## Migration boundary and demo data
 

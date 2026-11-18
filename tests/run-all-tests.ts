@@ -8,6 +8,7 @@ import { testAIAgents } from './agents.test';
 import { testSecurityAuditScenarios } from './audit-scenarios.test';
 import { testTransactionSafety } from './transactions.test';
 import { testAuthVerificationConcurrency } from './auth-verification.test';
+import { testAuthRateLimiter } from './auth-rate-limit.test';
 import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
 
 async function runAll() {
@@ -17,6 +18,7 @@ async function runAll() {
 
   try {
     await testLedgerEngine();
+    testAuthRateLimiter();
     await testAuthVerificationConcurrency();
     testFinancialSqliteSchema();
     await testTransactionSafety();

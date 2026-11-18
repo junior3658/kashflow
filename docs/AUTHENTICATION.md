@@ -12,7 +12,7 @@
 - Verification-code issuance and its 60-second resend cooldown run in one `BEGIN IMMEDIATE` transaction, so concurrent requests cannot create multiple active codes. A code is deleted if Resend rejects delivery, and cooldown responses do not disclose whether an email address belongs to an account.
 - Opaque random session tokens are stored as SHA-256 hashes and delivered in HttpOnly, SameSite=Lax cookies.
 - Protected application API routes, per-user transaction reads, wallet ownership checks, per-user AI conversation history and per-user audit-log reads.
-- Basic per-process authentication throttling. Production must also apply rate limits at the reverse proxy or hosting edge.
+- Bounded fixed-window authentication throttling per process (10 requests per 15 minutes per IP, with a 5,000-key memory cap). Production must also apply a shared rate limit at the reverse proxy or hosting edge; the local limiter is not distributed.
 
 ## Server configuration
 

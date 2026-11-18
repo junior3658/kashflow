@@ -131,6 +131,24 @@ export function testFinancialSqliteSchema() {
     assert.equal(refunded.internal_balance_minor, 10000);
     console.log('✓ REFUNDED requires a posted inverse batch.');
 
+    addTransaction({ id: 'tx-reversal-check', amount: 100 });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-reversal-check'").run();
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-reversal-check', 'wallet-a', 'USD', 100, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'PROCESSING' WHERE id = 'tx-reversal-check'").run();
+    addBatch('batch-reversal-check', 'tx-reversal-check', 'POSTING', 100);
+    addEntry('entry-reversal-check-debit', 'batch-reversal-check', 'account-wallet-a', 'DEBIT', 100);
+    addEntry('entry-reversal-check-credit', 'batch-reversal-check', 'account-wallet-b', 'CREDIT', 100);
+    sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-reversal-check'").run(now);
+    sql.prepare("UPDATE transactions SET status = 'SUCCEEDED' WHERE id = 'tx-reversal-check'").run();
+    addBatch('batch-reversal-check-invalid', 'tx-reversal-check', 'REVERSAL', 99, 'batch-reversal-check');
+    addEntry('entry-reversal-check-invalid-debit', 'batch-reversal-check-invalid', 'account-wallet-b', 'DEBIT', 99);
+    addEntry('entry-reversal-check-invalid-credit', 'batch-reversal-check-invalid', 'account-wallet-a', 'CREDIT', 99);
+    assert.throws(
+      () => sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-reversal-check-invalid'").run(now),
+      /exactly invert the original posted batch/,
+    );
+    console.log('✓ A reversal must exactly invert every original ledger line.');
+
     addTransaction({ id: 'tx-unbalanced', destinationWalletId: null, amount: 100 });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-unbalanced'").run();
     sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-unbalanced', 'wallet-a', 'USD', 100, 'ACTIVE', ?, ?)").run(now, now);
@@ -155,8 +173,16 @@ export function testFinancialSqliteSchema() {
       () => sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-shwary'").run(now),
       /verified and reconciled provider evidence/,
     );
-    sql.prepare("INSERT INTO provider_events (id, transaction_id, provider, provider_event_id, payload_sha256, received_at) VALUES ('event-shwary', 'tx-shwary', 'SHWARY', 'evt-001', ?, ?)").run('a'.repeat(64), now);
+    assert.throws(
+      () => sql.prepare("INSERT INTO provider_events (id, transaction_id, provider, provider_event_id, amount_minor, currency, normalized_status, payload_sha256, received_at) VALUES ('event-shwary-mismatch', 'tx-shwary', 'SHWARY', 'evt-mismatch', 249, 'USD', 'CONFIRMED', ?, ?)").run('b'.repeat(64), now),
+      /does not match transaction provider, amount or currency/,
+    );
+    sql.prepare("INSERT INTO provider_events (id, transaction_id, provider, provider_event_id, amount_minor, currency, normalized_status, payload_sha256, received_at) VALUES ('event-shwary', 'tx-shwary', 'SHWARY', 'evt-001', 250, 'USD', 'CONFIRMED', ?, ?)").run('a'.repeat(64), now);
     sql.prepare("UPDATE provider_events SET verification_status = 'VERIFIED', verified_at = ? WHERE id = 'event-shwary'").run(now);
+    assert.throws(
+      () => sql.prepare("UPDATE provider_events SET amount_minor = 249 WHERE id = 'event-shwary'").run(),
+      /amount, currency and normalized status are immutable/,
+    );
     sql.prepare("UPDATE provider_events SET reconciliation_status = 'MATCHED', reconciled_at = ? WHERE id = 'event-shwary'").run(now);
     sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-shwary'").run(now);
     sql.prepare("UPDATE transactions SET status = 'SUCCEEDED' WHERE id = 'tx-shwary'").run();
@@ -172,6 +198,10 @@ export function testFinancialSqliteSchema() {
       /UNIQUE constraint failed/,
     );
     insertIdempotency.run('user-b', 'request-1', 'b'.repeat(64), 'tx-idem-other', now);
+    assert.throws(
+      () => insertIdempotency.run('user-a', 'cross-tenant-key', 'd'.repeat(64), 'tx-idem-other', now),
+      /idempotency owner does not match transaction owner/,
+    );
     assert.throws(
       () => sql.prepare("UPDATE idempotency_keys SET request_sha256 = ? WHERE user_id = 'user-a' AND idempotency_key = 'request-1'").run('c'.repeat(64)),
       /immutable/,

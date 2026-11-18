@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 2;
+export const FINANCIAL_SCHEMA_VERSION = 3;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -175,6 +175,11 @@ CREATE TABLE IF NOT EXISTS provider_events (
   provider TEXT NOT NULL CHECK (provider IN ('PAYPAL', 'SHWARY')),
   provider_event_id TEXT NOT NULL,
   provider_reference TEXT,
+  amount_minor INTEGER NOT NULL
+    CHECK (typeof(amount_minor) = 'integer' AND amount_minor BETWEEN 1 AND 9007199254740991),
+  currency TEXT NOT NULL CHECK (currency IN ('USD', 'EUR', 'CDF')),
+  normalized_status TEXT NOT NULL
+    CHECK (normalized_status IN ('PENDING', 'CONFIRMED', 'FAILED', 'CANCELLED')),
   payload_sha256 TEXT NOT NULL CHECK (length(payload_sha256) = 64),
   verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED'
     CHECK (verification_status IN ('UNVERIFIED', 'VERIFIED', 'REJECTED')),
@@ -240,6 +245,16 @@ CREATE TRIGGER IF NOT EXISTS trg_idempotency_keys_no_delete
 BEFORE DELETE ON idempotency_keys
 BEGIN
   SELECT RAISE(ABORT, 'idempotency records are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_idempotency_owner_match
+BEFORE INSERT ON idempotency_keys
+WHEN NOT EXISTS (
+  SELECT 1 FROM transactions t
+  WHERE t.id = NEW.transaction_id AND t.user_id = NEW.user_id
+)
+BEGIN
+  SELECT RAISE(ABORT, 'idempotency owner does not match transaction owner');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_transactions_provider_reference_immutable
@@ -431,11 +446,18 @@ BEGIN
   WHERE id = OLD.wallet_id AND currency = OLD.currency;
 END;
 
+DROP TRIGGER IF EXISTS trg_provider_events_match_transaction;
 CREATE TRIGGER IF NOT EXISTS trg_provider_events_match_transaction
 BEFORE INSERT ON provider_events
-WHEN NEW.provider <> (SELECT provider FROM transactions WHERE id = NEW.transaction_id)
+WHEN NOT EXISTS (
+  SELECT 1 FROM transactions t
+  WHERE t.id = NEW.transaction_id
+    AND t.provider = NEW.provider
+    AND t.amount_minor = NEW.amount_minor
+    AND t.currency = NEW.currency
+)
 BEGIN
-  SELECT RAISE(ABORT, 'provider event does not match transaction provider');
+  SELECT RAISE(ABORT, 'provider event does not match transaction provider, amount or currency');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_provider_events_identity_immutable
@@ -443,6 +465,34 @@ BEFORE UPDATE OF transaction_id, provider, provider_event_id, provider_reference
 ON provider_events
 BEGIN
   SELECT RAISE(ABORT, 'provider event identity and payload hash are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_provider_events_evidence_required
+BEFORE INSERT ON provider_events
+WHEN NEW.amount_minor IS NULL OR typeof(NEW.amount_minor) <> 'integer' OR NEW.amount_minor <= 0
+  OR NEW.currency IS NULL OR NEW.currency NOT IN ('USD', 'EUR', 'CDF')
+  OR NEW.normalized_status IS NULL OR NEW.normalized_status NOT IN ('PENDING', 'CONFIRMED', 'FAILED', 'CANCELLED')
+BEGIN
+  SELECT RAISE(ABORT, 'provider event requires normalized amount, currency and status evidence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_provider_events_evidence_immutable
+BEFORE UPDATE OF amount_minor, currency, normalized_status ON provider_events
+BEGIN
+  SELECT RAISE(ABORT, 'provider event amount, currency and normalized status are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_provider_events_reconciliation_match
+BEFORE UPDATE OF reconciliation_status ON provider_events
+WHEN NEW.reconciliation_status = 'MATCHED'
+  AND NOT EXISTS (
+    SELECT 1 FROM transactions t
+    WHERE t.id = NEW.transaction_id AND t.provider = NEW.provider
+      AND t.amount_minor = NEW.amount_minor AND t.currency = NEW.currency
+      AND NEW.normalized_status = 'CONFIRMED' AND NEW.verification_status = 'VERIFIED'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'provider event cannot be matched without verified confirmed amount and currency evidence');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_insert_unposted
@@ -530,6 +580,47 @@ BEGIN
   SELECT RAISE(ABORT, 'posted ledger batches are immutable');
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_v3_ledger_reversal_exact_inverse
+BEFORE UPDATE OF posted_at ON ledger_batches
+WHEN OLD.posted_at IS NULL AND NEW.posted_at IS NOT NULL AND NEW.batch_type = 'REVERSAL'
+BEGIN
+  SELECT CASE WHEN
+    EXISTS (
+      SELECT account_id, currency, CASE entry_type WHEN 'DEBIT' THEN 'CREDIT' ELSE 'DEBIT' END, amount_minor, COUNT(*)
+      FROM ledger_entries WHERE batch_id = NEW.reversal_of_batch_id
+      GROUP BY account_id, currency, entry_type, amount_minor
+      EXCEPT
+      SELECT account_id, currency, entry_type, amount_minor, COUNT(*)
+      FROM ledger_entries WHERE batch_id = NEW.id
+      GROUP BY account_id, currency, entry_type, amount_minor
+    )
+    OR EXISTS (
+      SELECT account_id, currency, entry_type, amount_minor, COUNT(*)
+      FROM ledger_entries WHERE batch_id = NEW.id
+      GROUP BY account_id, currency, entry_type, amount_minor
+      EXCEPT
+      SELECT account_id, currency, CASE entry_type WHEN 'DEBIT' THEN 'CREDIT' ELSE 'DEBIT' END, amount_minor, COUNT(*)
+      FROM ledger_entries WHERE batch_id = NEW.reversal_of_batch_id
+      GROUP BY account_id, currency, entry_type, amount_minor
+    )
+  THEN RAISE(ABORT, 'reversal entries must exactly invert the original posted batch') END;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_v3_ledger_provider_evidence_match
+BEFORE UPDATE OF posted_at ON ledger_batches
+WHEN OLD.posted_at IS NULL AND NEW.posted_at IS NOT NULL AND NEW.batch_type = 'POSTING'
+  AND (SELECT provider FROM transactions WHERE id = NEW.transaction_id) <> 'INTERNAL'
+  AND NOT EXISTS (
+    SELECT 1 FROM provider_events e JOIN transactions t ON t.id = e.transaction_id
+    WHERE e.transaction_id = NEW.transaction_id AND e.provider = t.provider
+      AND e.verification_status = 'VERIFIED' AND e.reconciliation_status = 'MATCHED'
+      AND e.amount_minor = t.amount_minor AND e.currency = t.currency
+      AND e.normalized_status = 'CONFIRMED'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'provider evidence amount, currency and confirmed status must match the transaction');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_ledger_batches_apply_posting
 AFTER UPDATE OF posted_at ON ledger_batches
 WHEN OLD.posted_at IS NULL AND NEW.posted_at IS NOT NULL
@@ -586,6 +677,7 @@ export function openFinancialDatabase(
   sql.pragma('foreign_keys = ON');
   sql.pragma('busy_timeout = 5000');
   sql.pragma('journal_mode = WAL');
+  sql.pragma('synchronous = FULL');
 
   const currentVersion = Number(sql.pragma('user_version', { simple: true }));
   if (currentVersion > FINANCIAL_SCHEMA_VERSION) {
@@ -597,6 +689,19 @@ export function openFinancialDatabase(
 
   sql.exec('BEGIN IMMEDIATE');
   try {
+    // Additive v3 migration. Legacy provider events are not backfilled or trusted.
+    const providerEventsExists = sql.prepare(
+      "SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'provider_events'"
+    ).get();
+    if (providerEventsExists) {
+      const columns = new Set(
+        (sql.pragma('table_info(provider_events)') as Array<{ name: string }>).map((column) => column.name),
+      );
+      if (!columns.has('amount_minor')) sql.exec('ALTER TABLE provider_events ADD COLUMN amount_minor INTEGER');
+      if (!columns.has('currency')) sql.exec('ALTER TABLE provider_events ADD COLUMN currency TEXT');
+      if (!columns.has('normalized_status')) sql.exec('ALTER TABLE provider_events ADD COLUMN normalized_status TEXT');
+    }
+
     sql.exec(schema);
     sql.prepare('INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES(?, ?)').run(
       FINANCIAL_SCHEMA_VERSION,

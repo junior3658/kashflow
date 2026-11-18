@@ -18,17 +18,16 @@ import { LedgerEngine } from './ledger';
 import { LLMProvider } from './ai/llm-provider';
 import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
 import { requireAuth, readCookie } from './auth/middleware';
+import { FixedWindowRateLimiter } from './auth/rate-limit';
 
 export const apiRouter = Router();
 
-// Public authentication endpoints. A small per-process throttle is a prototype
-// safeguard; production deployment must also enforce edge/IP rate limits.
-const authAttempts = new Map<string, { count: number; resetAt: number }>();
+// Public authentication endpoints. This bounded per-process limiter is a
+// prototype safeguard; production must also enforce a shared edge/IP rate limit.
+const authRateLimiter = new FixedWindowRateLimiter({ limit: 10, windowMs: 15 * 60_000, maxKeys: 5000 });
 function authThrottle(req: Request, res: Response, next: any) {
-  const key = `${req.ip}:${req.path}`, now = Date.now();
-  const entry = authAttempts.get(key);
-  if (!entry || entry.resetAt <= now) authAttempts.set(key, { count: 1, resetAt: now + 15 * 60_000 });
-  else if (++entry.count > 10) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
+  const key = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!authRateLimiter.consume(key)) return res.status(429).json({ error: 'Too many attempts. Please try again later.' });
   next();
 }
 
