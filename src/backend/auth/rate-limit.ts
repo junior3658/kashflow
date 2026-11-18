@@ -31,8 +31,13 @@ export class FixedWindowRateLimiter {
       if (++inspected >= 64) break;
     }
     if (this.buckets.size >= this.maxKeys) {
-      const oldestKey = this.buckets.keys().next().value;
-      if (oldestKey !== undefined) this.buckets.delete(oldestKey);
+      // Never evict an active client's bucket: otherwise unique-key churn could
+      // reset another client's quota. At capacity, reject new keys until a
+      // window expires and a bounded cleanup creates room.
+      for (const [candidate, bucket] of this.buckets) {
+        if (bucket.resetAt <= now) this.buckets.delete(candidate);
+      }
+      if (this.buckets.size >= this.maxKeys) return false;
     }
     this.buckets.set(key, { count: 1, resetAt: now + this.options.windowMs });
     return true;

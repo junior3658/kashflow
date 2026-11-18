@@ -10,6 +10,9 @@ export function testAuthRateLimiter() {
   assert.equal(limiter.consume('ip-a', 1100), true);
   console.log('✓ Fixed-window limits reset at the expected boundary.');
   for (let index = 0; index < 20; index += 1) limiter.consume(`ip-${index}`, 1200);
-  assert.ok(limiter.trackedKeys <= 3, 'Rate-limit state must remain bounded under unique-key churn.');
-  console.log('✓ Unique-key churn cannot grow the in-process limiter beyond its configured capacity.');
+  assert.equal(limiter.trackedKeys, 3, 'Rate-limit state must remain within its configured capacity.');
+  assert.equal(limiter.consume('ip-overflow', 1200), false, 'Unknown keys must fail closed at capacity.');
+  assert.equal(limiter.consume('ip-overflow', 1300), true, 'Expired windows must free capacity for new keys.');
+  assert.ok(limiter.trackedKeys <= 3);
+  console.log('✓ Unique-key churn cannot evict active buckets; capacity fails closed until expiry.');
 }
