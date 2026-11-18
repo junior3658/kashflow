@@ -171,7 +171,7 @@ export function testFinancialSqliteSchema() {
     addEntry('entry-shwary-credit', 'batch-shwary', 'account-cash', 'CREDIT', 250);
     assert.throws(
       () => sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-shwary'").run(now),
-      /verified and reconciled provider evidence/,
+      /provider evidence amount, currency and confirmed status|verified and reconciled provider evidence/,
     );
     assert.throws(
       () => sql.prepare("INSERT INTO provider_events (id, transaction_id, provider, provider_event_id, amount_minor, currency, normalized_status, payload_sha256, received_at) VALUES ('event-shwary-mismatch', 'tx-shwary', 'SHWARY', 'evt-mismatch', 249, 'USD', 'CONFIRMED', ?, ?)").run('b'.repeat(64), now),
