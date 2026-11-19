@@ -17,10 +17,13 @@ import { SecurityAuditSuite } from './security/audit-scenarios';
 import { LedgerEngine } from './ledger';
 import { LLMProvider } from './ai/llm-provider';
 import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
-import { requireAuth, readCookie } from './auth/middleware';
+import { enforceSameOriginWrites, requireAuth, readCookie } from './auth/middleware';
 import { FixedWindowRateLimiter } from './auth/rate-limit';
 
 export const apiRouter = Router();
+
+// Apply CSRF/origin validation before both public auth and authenticated writes.
+apiRouter.use(enforceSameOriginWrites);
 
 // Public authentication endpoints. This bounded per-process limiter is a
 // prototype safeguard; production must also enforce a shared edge/IP rate limit.
