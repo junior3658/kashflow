@@ -1,6 +1,6 @@
 /**
  * Comprehensive Test Runner for KASHFLOW
- * Runs Ledger, Multi-Agent AI, and 10 Security Audit Scenarios.
+ * Runs Ledger, Multi-Agent AI, and security/authentication scenarios.
  */
 
 import { testLedgerEngine } from './ledger.test';
@@ -9,6 +9,7 @@ import { testSecurityAuditScenarios } from './audit-scenarios.test';
 import { testTransactionSafety } from './transactions.test';
 import { testAuthVerificationConcurrency } from './auth-verification.test';
 import { testAuthRateLimiter } from './auth-rate-limit.test';
+import { testAuthOriginGuard } from './auth-origin.test';
 import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
 
 async function runAll() {
@@ -19,6 +20,7 @@ async function runAll() {
   try {
     await testLedgerEngine();
     testAuthRateLimiter();
+    testAuthOriginGuard();
     await testAuthVerificationConcurrency();
     testFinancialSqliteSchema();
     await testTransactionSafety();

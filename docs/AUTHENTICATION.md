@@ -13,6 +13,7 @@
 - Opaque random session tokens are stored as SHA-256 hashes and delivered in HttpOnly, SameSite=Lax cookies.
 - Protected application API routes, per-user transaction reads, wallet ownership checks, per-user AI conversation history and per-user audit-log reads.
 - Bounded fixed-window authentication throttling per process (10 requests per 15 minutes per IP, with a 5,000-key memory cap that rejects new keys at capacity instead of evicting active quotas). Production must also apply a shared rate limit at the reverse proxy or hosting edge; the local limiter is not distributed.
+- Mutating API requests (including public authentication endpoints) require an exact, valid `Origin` matching `APP_URL`; requests without an Origin are rejected. The Shwary callback is currently exempt because it only acknowledges receipt and performs no settlement. This exemption must be removed or replaced with provider verification before callback processing gains side effects.
 
 ## Server configuration
 

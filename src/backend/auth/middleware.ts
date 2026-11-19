@@ -1,5 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSessionUserId, SESSION_COOKIE_NAME } from './store';
+import { isSameOriginWrite } from './origin';
+
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+export function enforceSameOriginWrites(req: Request, res: Response, next: NextFunction) {
+  // The callback currently has no settlement side effect and is exempt until its
+  // provider-authentication contract is implemented. It must not be exempted once
+  // a verified event processor is added.
+  if (req.path === '/payments/shwary/callback') return next();
+  if (!WRITE_METHODS.has(req.method)) return next();
+
+  const origin = req.get('origin');
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  if (!isSameOriginWrite(origin, appUrl)) {
+    return res.status(403).json({ error: 'Cross-origin or origin-less write request rejected.' });
+  }
+  next();
+}
 
 export function readCookie(req: Request, name: string): string | undefined {
   const header = req.headers.cookie;
@@ -15,17 +33,8 @@ export function readCookie(req: Request, name: string): string | undefined {
   return undefined;
 }
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  // Provider callbacks are machine-to-machine endpoints and have their own verification boundary.
+  // Provider callback is currently a no-op acknowledgement and has no settlement.
   if (req.path === '/payments/shwary/callback') return next();
-  const origin = req.get('origin');
-  if (origin && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    try {
-      const allowedOrigin = new URL(process.env.APP_URL || 'http://localhost:3000').origin;
-      if (new URL(origin).origin !== allowedOrigin) return res.status(403).json({ error: 'Cross-origin request rejected.' });
-    } catch {
-      return res.status(403).json({ error: 'Invalid request origin.' });
-    }
-  }
   const userId = getSessionUserId(readCookie(req, SESSION_COOKIE_NAME));
   if (!userId) return res.status(401).json({ error: 'Authentication required.' });
   (req as any).userId = userId;
