@@ -141,13 +141,16 @@ apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
   try {
-    const { amount, currency, recipientName, recipientAccount, sourceWalletId, provider, idempotencyKey } = req.body || {};
+    const { amount, currency, recipientName, recipientAccount, sourceWalletId, destinationWalletId, provider, idempotencyKey } = req.body || {};
     const userId = (req as any).userId as string;
     if (provider && provider !== 'INTERNAL') {
       return res.status(409).json({ error: 'External providers must use their dedicated verified payment flow; generic transfer confirmation cannot settle them.' });
     }
     if (currency && currency !== 'USD') {
       return res.status(409).json({ error: 'Internal transfers are temporarily limited to USD while currency-specific ledger accounts are completed.' });
+    }
+    if (typeof destinationWalletId !== 'string' || !destinationWalletId.trim()) {
+      return res.status(409).json({ error: 'Internal transfers require destinationWalletId. External beneficiaries must use a verified provider settlement flow.' });
     }
     const numericAmount = Number(amount);
     const amountCents = Math.round(numericAmount * 100);
@@ -165,6 +168,7 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
       orgId: ownedWallet.ownerId === currentOrgId ? currentOrgId : undefined,
       type: 'TRANSFER',
       sourceWalletId: ownedWallet.id,
+      destinationWalletId: destinationWalletId.trim(),
       amount: amountCents,
       currency: 'USD',
       recipientName: typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary',

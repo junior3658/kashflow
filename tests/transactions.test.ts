@@ -56,23 +56,22 @@ export async function testTransactionSafety() {
   }
   console.log('✓ Internal wallet-to-wallet settlement passed; unsafe one-sided refund was rejected.');
 
-  const payoutDraft = TransactionEngine.createDraft({
-    userId, type: 'TRANSFER', sourceWalletId, amount: 200, currency: 'USD',
-    provider: 'INTERNAL', description: 'External beneficiary must not be marked paid without a provider flow',
-  });
-  TransactionEngine.markPending(payoutDraft.id);
   const sourceBalanceBeforePayoutAttempt = db.wallets.get(sourceWalletId)!.internalAccountingBalance;
   let payoutWithoutDestinationRejected = false;
-  try { TransactionEngine.executeTransaction(payoutDraft.id); }
-  catch (error) { payoutWithoutDestinationRejected = error instanceof Error && error.message.includes('verified provider settlement workflow'); }
-  const blockedPayout = db.transactions.get(payoutDraft.id)!;
-  if (!payoutWithoutDestinationRejected || blockedPayout.status !== 'PENDING' ||
-      db.wallets.get(sourceWalletId)!.internalAccountingBalance !== sourceBalanceBeforePayoutAttempt ||
-      db.wallets.get(sourceWalletId)!.pendingDebits !== 200) {
-    throw new Error('An internal draft without a destination wallet was settled or mutated.');
+  try {
+    TransactionEngine.createDraft({
+      userId, type: 'TRANSFER', sourceWalletId, amount: 200, currency: 'USD',
+      provider: 'INTERNAL', description: 'External beneficiary must not be marked paid without a provider flow',
+    });
+  } catch (error) {
+    payoutWithoutDestinationRejected = error instanceof Error && error.message.includes('owned destination wallet');
   }
-  TransactionEngine.cancelTransaction(payoutDraft.id, 'Test cleanup');
-  console.log('✓ External beneficiary payout cannot settle through the internal wallet-transfer path.');
+  if (!payoutWithoutDestinationRejected ||
+      db.wallets.get(sourceWalletId)!.internalAccountingBalance !== sourceBalanceBeforePayoutAttempt ||
+      db.wallets.get(sourceWalletId)!.pendingDebits !== 0) {
+    throw new Error('An internal external-beneficiary draft was accepted or reserved funds.');
+  }
+  console.log('✓ External beneficiary payout is rejected before any reservation.');
 
   let unreservedDebitRejected = false;
   try { WalletService.applySettledDebit(sourceWalletId, 1); }
@@ -81,7 +80,7 @@ export async function testTransactionSafety() {
   console.log('✓ Settlement requires a matching pending reservation.');
 
   const releaseDraft = TransactionEngine.createDraft({
-    userId, type: 'TRANSFER', sourceWalletId, amount: 100, currency: 'USD',
+    userId, type: 'TRANSFER', sourceWalletId, destinationWalletId, amount: 100, currency: 'USD',
     provider: 'INTERNAL', description: 'Exact reservation release test',
   });
   TransactionEngine.markPending(releaseDraft.id);
@@ -145,21 +144,31 @@ export async function testTransactionSafety() {
   }
   console.log('✓ Cross-tenant destination wallet check passed.');
 
-  let externalSettlementRejected = false;
   const externalDraft = TransactionEngine.createDraft({
     userId, type: 'TRANSFER', sourceWalletId, amount: 500, currency: 'USD',
     provider: 'SHWARY', description: 'External provider must not settle generically',
   });
-  TransactionEngine.markPending(externalDraft.id);
+  const pendingBeforeExternalDraft = db.wallets.get(sourceWalletId)!.pendingDebits;
+  let externalReservationRejected = false;
+  try { TransactionEngine.markPending(externalDraft.id); }
+  catch (error) { externalReservationRejected = error instanceof Error && error.message.includes('provider-specific verified workflow'); }
+  if (!externalReservationRejected || externalDraft.status !== 'CREATED' ||
+      db.wallets.get(sourceWalletId)!.pendingDebits !== pendingBeforeExternalDraft) {
+    throw new Error('The generic engine reserved funds for an external-provider transaction.');
+  }
+  // Exercise the execution guard against a stale/legacy PENDING record as defense in depth.
+  externalDraft.status = 'PENDING';
+  let externalSettlementRejected = false;
   try { TransactionEngine.executeTransaction(externalDraft.id); }
-  catch { externalSettlementRejected = true; }
+  catch (error) { externalSettlementRejected = error instanceof Error && error.message.includes('verified provider confirmation'); }
+  externalDraft.status = 'CREATED';
   if (!externalSettlementRejected) throw new Error('Generic engine settled an external-provider transaction.');
   TransactionEngine.cancelTransaction(externalDraft.id, 'Test cleanup');
-  console.log('✓ External-provider generic settlement rejection passed.');
+  console.log('✓ External-provider reservations and generic settlement are both blocked.');
 
   let insufficientFundsRejected = false;
   const tooLarge = TransactionEngine.createDraft({
-    userId, type: 'TRANSFER', sourceWalletId, amount: Number.MAX_SAFE_INTEGER,
+    userId, type: 'TRANSFER', sourceWalletId, destinationWalletId, amount: Number.MAX_SAFE_INTEGER,
     currency: 'USD', provider: 'INTERNAL', description: 'Insufficient funds test',
   });
   try { TransactionEngine.markPending(tooLarge.id); }
