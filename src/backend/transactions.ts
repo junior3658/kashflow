@@ -78,9 +78,6 @@ export class TransactionEngine {
     if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
       throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }
-    if (params.provider === 'INTERNAL' && !params.destinationWalletId) {
-      throw new Error('Internal transfers require an owned destination wallet. External beneficiaries must use a verified provider settlement workflow.');
-    }
 
     // Verify source wallet exists
     const sourceWallet = db.wallets.get(params.sourceWalletId);
@@ -162,9 +159,6 @@ export class TransactionEngine {
 
     if (tx.status !== 'CREATED') {
       throw new Error(`Cannot transition to PENDING from status '${tx.status}'.`);
-    }
-    if (tx.provider !== 'INTERNAL') {
-      throw new Error('External-provider transactions cannot be reserved by the generic engine. A provider-specific verified workflow is required.');
     }
 
     // Reserve funds in wallet
