@@ -31,6 +31,10 @@
 - Transaction safety regression tests now cover successful pending settlement, cross-tenant wallet rejection, external-provider settlement rejection, insufficient-funds reservation rejection, idempotency payload conflicts, and separation of internal/provider balances.
 - Authentication concurrency tests now cover one-time verification-code consumption and the five-attempt ceiling under concurrent invalid requests.
 
+- Generic internal settlement now requires an owned destination wallet; an external beneficiary cannot be treated as paid by posting a local cash-disbursement entry.
+- In-memory refund execution now fails closed because the current engine cannot atomically reverse every affected wallet projection; no one-sided source-wallet credit is allowed.
+- Source and destination organization wallets are rechecked against an active organization and an explicit `ALL` or `TRANSACT` membership permission at draft, reservation and settlement boundaries.
+
 ## Important limitations
 
 This is a containment and hardening phase, **not** the SQLite financial-core migration.

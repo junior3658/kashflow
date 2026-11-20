@@ -8,12 +8,28 @@ export async function testTransactionSafety() {
   const sourceWalletId = 'wlt_personal_usd';
   const seedWallet = db.wallets.get(sourceWalletId)!;
   const before = seedWallet.internalAccountingBalance;
+  const destinationWalletId = 'wlt_transaction_test_destination';
+  db.wallets.set(destinationWalletId, {
+    id: destinationWalletId,
+    ownerId: userId,
+    type: 'PERSONAL',
+    currency: 'USD',
+    name: 'Transaction test destination',
+    internalAccountingBalance: 0,
+    externalProviderBalance: 0,
+    externalProviderBalanceStatus: 'NOT_SYNCED',
+    pendingDebits: 0,
+    pendingCredits: 0,
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
   if (seedWallet.externalProviderBalance !== 0 || seedWallet.externalProviderBalanceStatus !== 'NOT_SYNCED') {
     throw new Error('Seed ledger balances must not be represented as verified provider funds.');
   }
 
   const draft = TransactionEngine.createDraft({
-    userId, type: 'TRANSFER', sourceWalletId, amount: 1000, currency: 'USD',
+    userId, type: 'TRANSFER', sourceWalletId, destinationWalletId, amount: 1000, currency: 'USD',
     provider: 'INTERNAL', description: 'Automated transaction safety test',
     idempotencyKey: 'transaction-safety-test-001',
   });
@@ -24,9 +40,39 @@ export async function testTransactionSafety() {
   const settled = TransactionEngine.executeTransaction(draft.id);
   if (settled.status !== 'SUCCEEDED') throw new Error('A valid pending internal transfer did not settle.');
   if (db.wallets.get(sourceWalletId)!.internalAccountingBalance !== before - 1000) {
-    throw new Error('Wallet balance did not match the successful ledger settlement.');
+    throw new Error('Source wallet balance did not match the successful ledger settlement.');
   }
-  console.log('✓ Pending reservation and internal settlement passed.');
+  if (db.wallets.get(destinationWalletId)!.internalAccountingBalance !== 1000) {
+    throw new Error('Destination wallet did not receive the internal transfer credit.');
+  }
+
+  let refundRejected = false;
+  try { TransactionEngine.refundTransaction(settled.id, 'Safety test'); }
+  catch (error) { refundRejected = error instanceof Error && error.message.includes('Refunds are disabled'); }
+  if (!refundRejected) throw new Error('A one-sided in-memory refund was accepted.');
+  if (db.wallets.get(sourceWalletId)!.internalAccountingBalance !== before - 1000 ||
+      db.wallets.get(destinationWalletId)!.internalAccountingBalance !== 1000) {
+    throw new Error('A rejected refund changed a wallet balance.');
+  }
+  console.log('✓ Internal wallet-to-wallet settlement passed; unsafe one-sided refund was rejected.');
+
+  const payoutDraft = TransactionEngine.createDraft({
+    userId, type: 'TRANSFER', sourceWalletId, amount: 200, currency: 'USD',
+    provider: 'INTERNAL', description: 'External beneficiary must not be marked paid without a provider flow',
+  });
+  TransactionEngine.markPending(payoutDraft.id);
+  const sourceBalanceBeforePayoutAttempt = db.wallets.get(sourceWalletId)!.internalAccountingBalance;
+  let payoutWithoutDestinationRejected = false;
+  try { TransactionEngine.executeTransaction(payoutDraft.id); }
+  catch (error) { payoutWithoutDestinationRejected = error instanceof Error && error.message.includes('verified provider settlement workflow'); }
+  const blockedPayout = db.transactions.get(payoutDraft.id)!;
+  if (!payoutWithoutDestinationRejected || blockedPayout.status !== 'PENDING' ||
+      db.wallets.get(sourceWalletId)!.internalAccountingBalance !== sourceBalanceBeforePayoutAttempt ||
+      db.wallets.get(sourceWalletId)!.pendingDebits !== 200) {
+    throw new Error('An internal draft without a destination wallet was settled or mutated.');
+  }
+  TransactionEngine.cancelTransaction(payoutDraft.id, 'Test cleanup');
+  console.log('✓ External beneficiary payout cannot settle through the internal wallet-transfer path.');
 
   let unreservedDebitRejected = false;
   try { WalletService.applySettledDebit(sourceWalletId, 1); }
@@ -58,6 +104,33 @@ export async function testTransactionSafety() {
   } catch { ownershipRejected = true; }
   if (!ownershipRejected) throw new Error('Cross-tenant source wallet access was not rejected.');
   console.log('✓ Cross-tenant wallet ownership check passed.');
+
+  let forgedOrganizationRejected = false;
+  try {
+    TransactionEngine.createDraft({
+      userId: 'usr_patrick_02', orgId: 'org_kashflow_corp', type: 'TRANSFER',
+      sourceWalletId: 'wlt_business_usd', destinationWalletId: sourceWalletId,
+      amount: 100, currency: 'USD', provider: 'INTERNAL', description: 'Forged organization context',
+    });
+  } catch { forgedOrganizationRejected = true; }
+  if (!forgedOrganizationRejected) throw new Error('A user without organization membership accessed a business wallet.');
+
+  let businessWithoutMembershipContextRejected = false;
+  try {
+    TransactionEngine.createDraft({
+      userId, type: 'TRANSFER', sourceWalletId: 'wlt_business_usd', destinationWalletId: sourceWalletId,
+      amount: 100, currency: 'USD', provider: 'INTERNAL', description: 'Missing organization context',
+    });
+  } catch { businessWithoutMembershipContextRejected = true; }
+  if (!businessWithoutMembershipContextRejected) throw new Error('A business wallet was accessed without explicit organization context.');
+
+  const authorizedBusinessDraft = TransactionEngine.createDraft({
+    userId, orgId: 'org_kashflow_corp', type: 'TRANSFER', sourceWalletId: 'wlt_business_usd',
+    destinationWalletId: sourceWalletId, amount: 100, currency: 'USD', provider: 'INTERNAL',
+    description: 'Authorized organization member access',
+  });
+  TransactionEngine.cancelTransaction(authorizedBusinessDraft.id, 'Test cleanup');
+  console.log('✓ Organization wallet access requires an active organization and explicit membership permission.');
 
   let destinationOwnershipRejected = false;
   try {
@@ -119,4 +192,5 @@ export async function testTransactionSafety() {
   walletBeforeCredit.internalAccountingBalance = internalBalanceBeforeCredit;
   console.log('✓ Internal/provider balance separation check passed.');
 
+  db.wallets.delete(destinationWalletId);
 }

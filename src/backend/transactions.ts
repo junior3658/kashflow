@@ -4,9 +4,24 @@
  */
 
 import { db } from './db';
-import { Transaction, TransactionStatus, TransactionType, Currency } from './types';
+import { Transaction, TransactionStatus, TransactionType, Currency, Wallet } from './types';
 import { WalletService } from './wallets';
 import { LedgerEngine } from './ledger';
+
+function canAccessWallet(wallet: Wallet, userId: string, orgId?: string): boolean {
+  if (wallet.ownerId === userId) return true;
+  if (!orgId || wallet.ownerId !== orgId) return false;
+
+  const organization = db.organizations.get(orgId);
+  if (!organization || organization.status !== 'ACTIVE') return false;
+
+  const membership = Array.from(db.memberships.values()).find(
+    (candidate) => candidate.orgId === orgId && candidate.userId === userId,
+  );
+  return Boolean(membership && (
+    membership.permissions.includes('ALL') || membership.permissions.includes('TRANSACT')
+  ));
+}
 
 export interface CreateDraftParams {
   idempotencyKey?: string;
@@ -69,8 +84,8 @@ export class TransactionEngine {
     if (!sourceWallet) {
       throw new Error(`Source wallet '${params.sourceWalletId}' does not exist.`);
     }
-    if (sourceWallet.ownerId !== params.userId && (!params.orgId || sourceWallet.ownerId !== params.orgId)) {
-      throw new Error('Source wallet does not belong to the authenticated user or authorized organization.');
+    if (!canAccessWallet(sourceWallet, params.userId, params.orgId)) {
+      throw new Error('Source wallet does not belong to the authenticated user or an active organization membership with transaction permission.');
     }
     if (sourceWallet.currency !== params.currency) {
       throw new Error('Transaction currency must match the source wallet currency.');
@@ -83,9 +98,8 @@ export class TransactionEngine {
       if (destinationWallet.id === sourceWallet.id) throw new Error('Source and destination wallets must be different.');
       if (destinationWallet.currency !== params.currency) throw new Error('Destination wallet currency must match the transaction currency.');
       if (destinationWallet.status !== 'ACTIVE') throw new Error('Destination wallet is not active.');
-      if (destinationWallet.ownerId !== params.userId &&
-          (!params.orgId || destinationWallet.ownerId !== params.orgId)) {
-        throw new Error('Destination wallet does not belong to the authenticated user or authorized organization.');
+      if (!canAccessWallet(destinationWallet, params.userId, params.orgId)) {
+        throw new Error('Destination wallet does not belong to the authenticated user or an active organization membership with transaction permission.');
       }
     }
 
@@ -149,7 +163,9 @@ export class TransactionEngine {
 
     // Reserve funds in wallet
     const sourceWallet = db.wallets.get(tx.sourceWalletId);
-    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE' || !canAccessWallet(sourceWallet, tx.userId, tx.orgId)) {
+      throw new Error('Source wallet is unavailable to this transaction tenant.');
+    }
     if (sourceWallet.currency !== tx.currency) throw new Error('Source wallet currency mismatch.');
     WalletService.reservePendingDebit(tx.sourceWalletId, tx.amount + tx.fee);
 
@@ -177,25 +193,26 @@ export class TransactionEngine {
       throw new Error('Internal ledger settlement is temporarily limited to USD.');
     }
 
+    if (!tx.destinationWalletId) {
+      throw new Error('Internal settlement requires a destination wallet. External disbursements must use a verified provider settlement workflow.');
+    }
+    const destinationWalletId = tx.destinationWalletId;
     const sourceWallet = db.wallets.get(tx.sourceWalletId);
-    const destinationWallet = tx.destinationWalletId ? db.wallets.get(tx.destinationWalletId) : undefined;
+    const destinationWallet = db.wallets.get(destinationWalletId);
     const settlementTotal = tx.amount + tx.fee;
     if (!Number.isSafeInteger(settlementTotal)) throw new Error('Settlement total exceeds the safe integer range.');
-    if (!sourceWallet || sourceWallet.status !== 'ACTIVE') throw new Error('Source wallet is unavailable.');
+    if (!sourceWallet || sourceWallet.status !== 'ACTIVE' || !canAccessWallet(sourceWallet, tx.userId, tx.orgId)) {
+      throw new Error('Source wallet is unavailable to this transaction tenant.');
+    }
     if (sourceWallet.currency !== tx.currency || sourceWallet.pendingDebits < settlementTotal ||
         sourceWallet.internalAccountingBalance < settlementTotal) {
       throw new Error('Reserved funds or wallet balance are inconsistent; settlement was stopped.');
     }
-    if (tx.destinationWalletId) {
-      if (!destinationWallet || destinationWallet.status !== 'ACTIVE' ||
-          destinationWallet.currency !== tx.currency || destinationWallet.id === sourceWallet.id ||
-          !Number.isSafeInteger(destinationWallet.internalAccountingBalance + tx.amount)) {
-        throw new Error('Destination wallet is unavailable or cannot accept this settlement.');
-      }
-      if (destinationWallet.ownerId !== tx.userId &&
-          (!tx.orgId || destinationWallet.ownerId !== tx.orgId)) {
-        throw new Error('Destination wallet ownership changed; settlement was stopped.');
-      }
+    if (!destinationWallet || destinationWallet.status !== 'ACTIVE' ||
+        destinationWallet.currency !== tx.currency || destinationWallet.id === sourceWallet.id ||
+        !Number.isSafeInteger(destinationWallet.internalAccountingBalance + tx.amount) ||
+        !canAccessWallet(destinationWallet, tx.userId, tx.orgId)) {
+      throw new Error('Destination wallet is unavailable to this transaction tenant or cannot accept this settlement.');
     }
 
     tx.status = 'PROCESSING';
@@ -213,7 +230,7 @@ export class TransactionEngine {
           description: `Settlement: ${tx.description}`,
         },
         {
-          accountCode: destinationWallet ? '2010' : '1010', // Internal transfer moves liability; external disbursement reduces cash
+          accountCode: '2010', // Both sides are customer-wallet liabilities; no external cash payout is implied.
           entryType: 'CREDIT',
           amount: tx.amount,
           currency: tx.currency,
@@ -234,9 +251,7 @@ export class TransactionEngine {
 
       // 2. Apply the corresponding wallet mutation after the ledger batch succeeds.
       WalletService.applySettledDebit(tx.sourceWalletId, settlementTotal);
-      if (tx.destinationWalletId && db.wallets.has(tx.destinationWalletId)) {
-        WalletService.applySettledCredit(tx.destinationWalletId, tx.amount);
-      }
+      WalletService.applySettledCredit(destinationWalletId, tx.amount);
 
       tx.status = 'SUCCEEDED';
       if (providerRef) tx.providerReference = providerRef;
@@ -277,22 +292,15 @@ export class TransactionEngine {
   /**
    * Refund a succeeded transaction with ledger reversal
    */
-  static refundTransaction(transactionId: string, reason: string): Transaction {
+  static refundTransaction(transactionId: string, _reason: string): Transaction {
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
-
     if (tx.status !== 'SUCCEEDED') {
       throw new Error(`Cannot refund transaction with status '${tx.status}'.`);
     }
 
-    // 1. Ledger reversal
-    LedgerEngine.reverseTransaction(tx.id, reason);
-
-    // 2. Restore the full amount originally reserved, including the reversed fee.
-    WalletService.applySettledCredit(tx.sourceWalletId, tx.amount + tx.fee);
-
-    tx.status = 'REFUNDED';
-    tx.updatedAt = new Date().toISOString();
-    return tx;
+    // The in-memory engine cannot atomically reverse every affected wallet projection.
+    // Fail closed rather than crediting the source while leaving a destination credited.
+    throw new Error('Refunds are disabled until persistent ledger reversal and all wallet projections can be committed atomically.');
   }
 }
