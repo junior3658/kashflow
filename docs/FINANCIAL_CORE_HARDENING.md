@@ -64,3 +64,6 @@ This is a containment and hardening phase, **not** the SQLite financial-core mig
 - The generic `markPending` path rejects external-provider transactions before any reservation.
 - Both source and destination wallet status, currency and tenant access are rechecked at reservation time.
 - External provider drafts remain in `CREATED` until their provider-specific verified workflow is implemented; they cannot reserve funds through the generic engine.
+
+
+The `POST /transfers/draft` API now requires an explicit destination wallet ID and rejects external beneficiary account strings. The generic transfer endpoint is strictly wallet-to-wallet; provider payouts remain disabled until a verified provider workflow is implemented.
