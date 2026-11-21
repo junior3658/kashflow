@@ -56,3 +56,11 @@ This is a containment and hardening phase, **not** the SQLite financial-core mig
 5. Use SQLite transactions for reservation, ledger posting, and wallet projection updates; add concurrent-request tests.
 6. Add verified provider-event storage and reconciliation before enabling any external settlement.
 
+
+
+## Regression guard restored on 21 November 2026
+
+- Generic internal drafts require a destination wallet before creation.
+- The generic `markPending` path rejects external-provider transactions before any reservation.
+- Both source and destination wallet status, currency and tenant access are rechecked at reservation time.
+- External provider drafts remain in `CREATED` until their provider-specific verified workflow is implemented; they cannot reserve funds through the generic engine.

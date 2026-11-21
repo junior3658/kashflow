@@ -78,6 +78,9 @@ export class TransactionEngine {
     if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
       throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }
+    if (params.provider === 'INTERNAL' && (!params.destinationWalletId || !params.destinationWalletId.trim())) {
+      throw new Error('Internal transfers require an owned destination wallet. External disbursements must use a verified provider workflow.');
+    }
 
     // Verify source wallet exists
     const sourceWallet = db.wallets.get(params.sourceWalletId);
@@ -160,13 +163,25 @@ export class TransactionEngine {
     if (tx.status !== 'CREATED') {
       throw new Error(`Cannot transition to PENDING from status '${tx.status}'.`);
     }
+    if (tx.provider !== 'INTERNAL') {
+      throw new Error('External-provider transactions cannot be reserved by the generic engine. A verified provider workflow is required.');
+    }
+    if (!tx.destinationWalletId) {
+      throw new Error('Internal transfers require a destination wallet before funds can be reserved.');
+    }
 
-    // Reserve funds in wallet
+    // Revalidate both wallet identities and tenant access at reservation time.
     const sourceWallet = db.wallets.get(tx.sourceWalletId);
+    const destinationWallet = db.wallets.get(tx.destinationWalletId);
     if (!sourceWallet || sourceWallet.status !== 'ACTIVE' || !canAccessWallet(sourceWallet, tx.userId, tx.orgId)) {
       throw new Error('Source wallet is unavailable to this transaction tenant.');
     }
     if (sourceWallet.currency !== tx.currency) throw new Error('Source wallet currency mismatch.');
+    if (!destinationWallet || destinationWallet.status !== 'ACTIVE' ||
+        destinationWallet.currency !== tx.currency || destinationWallet.id === sourceWallet.id ||
+        !canAccessWallet(destinationWallet, tx.userId, tx.orgId)) {
+      throw new Error('Destination wallet is unavailable to this transaction tenant.');
+    }
     WalletService.reservePendingDebit(tx.sourceWalletId, tx.amount + tx.fee);
 
     tx.status = 'PENDING';
