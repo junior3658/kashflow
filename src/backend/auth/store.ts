@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
 import { db } from '../db';
+import { getFinancialRepository } from '../financial/repository';
 import { sendVerificationEmail } from './email';
 
 const scrypt = promisify(scryptCb);
@@ -99,6 +100,7 @@ export function revokeSession(token?: string) {
 }
 
 function addRuntimeUser(user: any) {
+  getFinancialRepository().provisionPersonalWallets(user.id, user.created_at);
   const isBusiness = user.account_type === 'BUSINESS';
   const orgId = isBusiness ? `org_${user.id}` : undefined;
   db.users.set(user.id, {
