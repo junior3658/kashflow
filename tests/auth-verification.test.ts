@@ -10,7 +10,9 @@ export async function testAuthVerificationConcurrency() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'kashflow-auth-test-'));
   const databasePath = path.join(directory, 'auth.sqlite');
   const previousDatabasePath = process.env.AUTH_DATABASE_PATH;
+  const previousFinancialDatabasePath = process.env.FINANCIAL_DATABASE_PATH;
   process.env.AUTH_DATABASE_PATH = databasePath;
+  process.env.FINANCIAL_DATABASE_PATH = path.join(directory, 'financial.sqlite');
 
   try {
     const { verifyEmail } = await import('../src/backend/auth/store');
@@ -155,5 +157,7 @@ export async function testAuthVerificationConcurrency() {
   } finally {
     if (previousDatabasePath === undefined) delete process.env.AUTH_DATABASE_PATH;
     else process.env.AUTH_DATABASE_PATH = previousDatabasePath;
+    if (previousFinancialDatabasePath === undefined) delete process.env.FINANCIAL_DATABASE_PATH;
+    else process.env.FINANCIAL_DATABASE_PATH = previousFinancialDatabasePath;
   }
 }
