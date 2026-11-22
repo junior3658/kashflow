@@ -48,3 +48,10 @@ The current db.ts seeds illustrative balances and historical transactions, inclu
 6. Add restart, concurrent-spend, rollback, tenant-isolation and provider-event replay tests before enabling any settlement path.
 
 Until those steps are complete, the financial domain remains a prototype and must not process real funds.
+
+
+## Incremental personal-wallet provisioning (November 2026)
+
+The new `FinancialRepository.provisionPersonalWallets` step provisions three zero-balance personal wallet rows (USD/EUR/CDF) and their linked liability accounts for verified auth users. It uses an explicit `BEGIN IMMEDIATE` transaction and is idempotent. The runtime auth bootstrap invokes this provisioning when it loads a verified user.
+
+This is **not yet a financial-service cutover**: map-backed wallet reads, reservations, transaction state and ledger posting remain in the application. Business-wallet provisioning, authoritative persistent membership reads, ledger operations and transaction persistence remain future steps. No seeded/demo balances are imported. If a wallet projection is non-zero but its linked ledger account is missing, provisioning fails rather than fabricating an opening entry.
