@@ -11,6 +11,7 @@ import { testAuthVerificationConcurrency } from './auth-verification.test';
 import { testAuthRateLimiter } from './auth-rate-limit.test';
 import { testAuthOriginGuard } from './auth-origin.test';
 import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
+import { testFinancialWalletProvisioning } from './financial-wallet-provisioning.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -23,6 +24,7 @@ async function runAll() {
     testAuthOriginGuard();
     await testAuthVerificationConcurrency();
     testFinancialSqliteSchema();
+    testFinancialWalletProvisioning();
     await testTransactionSafety();
     console.log('');
     await testAIAgents();
