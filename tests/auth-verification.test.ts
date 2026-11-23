@@ -83,6 +83,29 @@ export async function testAuthVerificationConcurrency() {
     }
     console.log('✓ Concurrent invalid codes cannot exceed the five-attempt limit.');
 
+    const malformedUserId = 'usr_auth_malformed_hash';
+    const malformedEmail = 'auth-malformed-hash@example.test';
+    const malformedCodeId = randomBytes(16).toString('hex');
+    authDb.prepare(
+      'INSERT INTO auth_users(id,email,full_name,password_hash,password_salt,created_at) VALUES(?,?,?,?,?,?)'
+    ).run(malformedUserId, malformedEmail, 'Malformed Hash Test', 'unused', 'unused', now);
+    authDb.prepare(
+      'INSERT INTO verification_codes(id, user_id, code_hash, expires_at, created_at) VALUES(?,?,?,?,?)'
+    ).run(malformedCodeId, malformedUserId, '00', Date.now() + 600000, Date.now());
+    let malformedHashRejected = false;
+    try { await verifyEmail(malformedEmail, '123456'); }
+    catch (error) {
+      if (error instanceof RangeError) throw error;
+      malformedHashRejected = true;
+    }
+    const malformedAttempts = (authDb.prepare(
+      'SELECT attempts FROM verification_codes WHERE id = ?'
+    ).get(malformedCodeId) as { attempts: number }).attempts;
+    if (!malformedHashRejected || malformedAttempts !== 1) {
+      throw new Error('Malformed stored verification hashes must fail as an invalid code and consume one attempt.');
+    }
+    console.log('✓ Malformed stored verification hashes fail closed without throwing a length-related runtime error.');
+
     const previousFetch = globalThis.fetch;
     const previousResendApiKey = process.env.RESEND_API_KEY;
     const previousResendFrom = process.env.RESEND_FROM_EMAIL;

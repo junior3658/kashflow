@@ -13,6 +13,15 @@ const SESSION_MS = 7 * 86400000;
 const CODE_MS = 600000;
 const dbPath = path.resolve(process.env.AUTH_DATABASE_PATH || 'data/kashflow-auth.sqlite');
 
+type AuthRuntimeUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+  account_type: 'PERSONAL' | 'BUSINESS';
+  business_name: string | null;
+};
+
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const sql = new Database(dbPath);
 sql.pragma('journal_mode = WAL');
@@ -99,10 +108,15 @@ export function revokeSession(token?: string) {
   if (token) sql.prepare('DELETE FROM auth_sessions WHERE token_hash = ?').run(sha(token));
 }
 
-function addRuntimeUser(user: any) {
-  getFinancialRepository().provisionPersonalWallets(user.id, user.created_at);
+function addRuntimeUser(user: AuthRuntimeUser): void {
+  const financialRepository = getFinancialRepository();
+  financialRepository.provisionPersonalWallets(user.id, user.created_at);
   const isBusiness = user.account_type === 'BUSINESS';
   const orgId = isBusiness ? `org_${user.id}` : undefined;
+  if (isBusiness && orgId) {
+    const businessName = user.business_name?.trim() || `${user.full_name}'s business`;
+    financialRepository.provisionBusinessWallet(user.id, orgId, businessName, user.created_at);
+  }
   db.users.set(user.id, {
     id: user.id,
     email: user.email,
@@ -157,7 +171,7 @@ function addRuntimeUser(user: any) {
 
 for (const user of sql.prepare(
   'SELECT id, email, full_name, created_at, account_type, business_name FROM auth_users WHERE verified_at IS NOT NULL'
-).all() as any[]) {
+).all() as AuthRuntimeUser[]) {
   addRuntimeUser(user);
 }
 
@@ -272,7 +286,7 @@ export async function verifyEmail(emailInput: string, code: string) {
   const actual = Buffer.from(await passwordHash(code, verification.id), 'hex');
   const expected = Buffer.from(verification.code_hash, 'hex');
 
-  if (!timingSafeEqual(actual, expected)) {
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     // Conditional SQL update makes the five-attempt limit safe under concurrent requests.
     sql.prepare(`
       UPDATE verification_codes
@@ -336,8 +350,12 @@ export async function loginAccount(emailInput: string, password: string) {
   }
 
   const user = sql.prepare(
-    'SELECT id, password_hash, password_salt, verified_at FROM auth_users WHERE email = ?'
-  ).get(emailNorm(emailInput)) as any;
+    'SELECT id, email, full_name, created_at, account_type, business_name, password_hash, password_salt, verified_at FROM auth_users WHERE email = ?'
+  ).get(emailNorm(emailInput)) as (AuthRuntimeUser & {
+    password_hash: string;
+    password_salt: string;
+    verified_at: string | null;
+  }) | undefined;
 
   if (!user) {
     await passwordHash(password, randomBytes(16).toString('hex'));
@@ -352,6 +370,8 @@ export async function loginAccount(emailInput: string, password: string) {
   }
   if (!user.verified_at) throw new Error('Verify your email before signing in.');
 
+  // Idempotently repair runtime projections and persistent wallet provisioning on login.
+  addRuntimeUser(user);
   return session(user.id);
 }
 

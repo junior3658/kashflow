@@ -55,3 +55,11 @@ Until those steps are complete, the financial domain remains a prototype and mus
 The new `FinancialRepository.provisionPersonalWallets` step provisions three zero-balance personal wallet rows (USD/EUR/CDF) and their linked liability accounts for verified auth users. It uses an explicit `BEGIN IMMEDIATE` transaction and is idempotent. The runtime auth bootstrap invokes this provisioning when it loads a verified user.
 
 This is **not yet a financial-service cutover**: map-backed wallet reads, reservations, transaction state and ledger posting remain in the application. Business-wallet provisioning, authoritative persistent membership reads, ledger operations and transaction persistence remain future steps. No seeded/demo balances are imported. If a wallet projection is non-zero but its linked ledger account is missing, provisioning fails rather than fabricating an opening entry.
+
+## Incremental business-wallet provisioning (November 2026)
+
+Verified self-registered BUSINESS accounts now provision their organization identity, an ACTIVE OWNER membership with explicit `can_transact = 1`, a zero-balance USD business wallet and its linked LIABILITY ledger account in one `BEGIN IMMEDIATE` transaction. The organization ID is deterministic (`org_<userId>`), and existing suspended organizations, revoked memberships, mismatched wallet identities or non-zero projections without a matching ledger account fail closed. Repeated provisioning is idempotent.
+
+This records the account owner's self-declared business workspace; it is not legal-entity verification, KYC or authorization for provider payouts. The runtime still keeps map-backed business objects for compatibility. Financial reads, reservations, transaction state and ledger posting have not yet been cut over to SQLite.
+
+Authentication now retries the idempotent runtime/financial provisioning when a verified user signs in. A malformed stored verification-code hash is treated as an invalid code rather than allowing `timingSafeEqual` to throw on unequal buffer lengths.

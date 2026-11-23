@@ -50,6 +50,58 @@ export function testFinancialWalletProvisioning() {
     assert.notDeepEqual(otherUser, first);
 
     assert.throws(() => repository.provisionPersonalWallets('', createdAt), /owner ID/);
+    const businessWalletId = repository.provisionBusinessWallet(
+      'business-user', 'org_business-user', 'Example Business', createdAt,
+    );
+    assert.equal(businessWalletId, 'wlt_org_business-user_usd');
+    const businessWallet = sql.prepare(
+      'SELECT owner_type, owner_id, wallet_type, currency, internal_balance_minor, provider_balance_status FROM wallets WHERE id = ?'
+    ).get(businessWalletId) as Record<string, unknown>;
+    assert.equal(businessWallet.owner_type, 'ORGANIZATION');
+    assert.equal(businessWallet.owner_id, 'org_business-user');
+    assert.equal(businessWallet.wallet_type, 'BUSINESS');
+    assert.equal(businessWallet.currency, 'USD');
+    assert.equal(businessWallet.internal_balance_minor, 0);
+    assert.equal(businessWallet.provider_balance_status, 'NOT_SYNCED');
+
+    const ownerMembership = sql.prepare(
+      'SELECT role, status, can_transact FROM organization_memberships WHERE organization_id = ? AND user_id = ?'
+    ).get('org_business-user', 'business-user') as Record<string, unknown>;
+    assert.equal(ownerMembership.role, 'OWNER');
+    assert.equal(ownerMembership.status, 'ACTIVE');
+    assert.equal(ownerMembership.can_transact, 1);
+
+    const businessAccount = sql.prepare(
+      'SELECT account_type, currency, wallet_id, balance_minor FROM ledger_accounts WHERE wallet_id = ?'
+    ).get(businessWalletId) as Record<string, unknown>;
+    assert.equal(businessAccount.account_type, 'LIABILITY');
+    assert.equal(businessAccount.currency, 'USD');
+    assert.equal(businessAccount.wallet_id, businessWalletId);
+    assert.equal(businessAccount.balance_minor, 0);
+
+    assert.equal(repository.provisionBusinessWallet(
+      'business-user', 'org_business-user', 'Example Business', '2026-11-23T10:00:00.000Z',
+    ), businessWalletId);
+    assert.equal((sql.prepare('SELECT COUNT(*) AS count FROM organization_memberships WHERE organization_id = ?').get('org_business-user') as {count:number}).count, 1);
+    assert.equal((sql.prepare('SELECT COUNT(*) AS count FROM wallets WHERE owner_id = ?').get('org_business-user') as {count:number}).count, 1);
+
+    const insertOrganizationTransaction = (id: string, userId: string) => sql.prepare(`
+      INSERT INTO transactions (
+        id, user_id, org_id, transaction_type, status, source_wallet_id, destination_wallet_id,
+        amount_minor, fee_minor, currency, provider, description, created_at, updated_at
+      ) VALUES (?, ?, 'org_business-user', 'TRANSFER', 'CREATED', ?, ?, 100, 0, 'USD', 'INTERNAL', 'Tenant isolation test', ?, ?)
+    `).run(id, userId, businessWalletId, 'wlt_business-user_usd', createdAt, createdAt);
+    assert.doesNotThrow(() => insertOrganizationTransaction('tx_org_owner', 'business-user'));
+    assert.throws(() => insertOrganizationTransaction('tx_org_intruder', 'intruder-user'), /active organization membership/);
+
+    sql.prepare(`UPDATE organization_memberships SET status = 'REVOKED' WHERE organization_id = ? AND user_id = ?`)
+      .run('org_business-user', 'business-user');
+    assert.throws(() => insertOrganizationTransaction('tx_org_revoked', 'business-user'), /active organization membership/);
+    assert.throws(() => repository.provisionBusinessWallet(
+      'business-user', 'org_business-user', 'Example Business', createdAt,
+    ), /membership is revoked/);
+    console.log('✓ Business wallet, owner membership and liability account persist atomically and idempotently.');
+    console.log('✓ SQL tenant guard rejects non-members and revoked organization owners.');
     console.log('✓ Personal wallets and linked zero-balance liability accounts are provisioned atomically and idempotently.');
     console.log('✓ Wallet identities remain isolated by authenticated user.');
   } finally {
