@@ -50,6 +50,7 @@ export function testFinancialWalletProvisioning() {
     assert.notDeepEqual(otherUser, first);
 
     assert.throws(() => repository.provisionPersonalWallets('', createdAt), /owner ID/);
+    repository.provisionPersonalWallets('business-user', createdAt);
     const businessWalletId = repository.provisionBusinessWallet(
       'business-user', 'org_business-user', 'Example Business', createdAt,
     );
