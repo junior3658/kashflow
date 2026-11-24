@@ -1,4 +1,4 @@
-# SQLite financial schema foundation (version 3)
+# SQLite financial schema foundation (version 4)
 
 ## Scope of this change
 
@@ -63,3 +63,7 @@ Verified self-registered BUSINESS accounts now provision their organization iden
 This records the account owner's self-declared business workspace; it is not legal-entity verification, KYC or authorization for provider payouts. The runtime still keeps map-backed business objects for compatibility. Financial reads, reservations, transaction state and ledger posting have not yet been cut over to SQLite.
 
 Authentication now retries the idempotent runtime/financial provisioning when a verified user signs in. A malformed stored verification-code hash is treated as an invalid code rather than allowing `timingSafeEqual` to throw on unequal buffer lengths.
+
+## Version 4 — persistent organization-membership authorization
+
+Runtime business-wallet reads and internal-transfer authorization now consult the persistent organization membership table in addition to the existing runtime checks. Read access requires an active organization and active membership; transaction access also requires the explicit `can_transact` permission. Revocation is performed through a repository transaction and is terminal: revoked rows cannot be reactivated or deleted/reinserted to restore access. This is an authorization bridge only; financial balances, reservations, transaction state and posting remain map-backed until the repository cutover.
