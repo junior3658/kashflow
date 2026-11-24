@@ -76,10 +76,9 @@ export class SecurityAuditSuite {
     const draft2 = TransactionEngine.createDraft({
       idempotencyKey: key,
       userId: 'usr_junior_01',
-      orgId: 'org_kashflow_corp',
       type: 'TRANSFER',
       sourceWalletId: 'wlt_personal_usd',
-      destinationWalletId: 'wlt_business_usd',
+      destinationWalletId,
       amount: 5000,
       currency: 'USD',
       provider: 'INTERNAL',
