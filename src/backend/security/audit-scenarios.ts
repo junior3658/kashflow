@@ -52,13 +52,21 @@ export class SecurityAuditSuite {
   static async testDuplicatePaymentIdempotency(): Promise<SecurityScenarioResult> {
     const start = Date.now();
     const key = `test_idem_${Date.now()}`;
+    const destinationWalletId = `wlt_audit_idempotency_${Date.now()}`;
+    const now = new Date().toISOString();
+    db.wallets.set(destinationWalletId, {
+      id: destinationWalletId, ownerId: 'usr_junior_01', type: 'PERSONAL',
+      currency: 'USD', name: 'Idempotency audit destination', internalAccountingBalance: 0,
+      externalProviderBalance: 0, externalProviderBalanceStatus: 'NOT_SYNCED',
+      pendingDebits: 0, pendingCredits: 0, status: 'ACTIVE',
+      createdAt: now, updatedAt: now,
+    });
     const draft1 = TransactionEngine.createDraft({
       idempotencyKey: key,
       userId: 'usr_junior_01',
-      orgId: 'org_kashflow_corp',
       type: 'TRANSFER',
       sourceWalletId: 'wlt_personal_usd',
-      destinationWalletId: 'wlt_business_usd',
+      destinationWalletId,
       amount: 5000,
       currency: 'USD',
       provider: 'INTERNAL',
@@ -79,6 +87,7 @@ export class SecurityAuditSuite {
     });
 
     const isIdentical = draft1.id === draft2.id;
+    db.wallets.delete(destinationWalletId);
     return {
       id: 1,
       title: 'Duplicate Payment Request (Idempotency Key)',
