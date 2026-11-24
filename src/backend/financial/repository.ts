@@ -172,9 +172,56 @@ export class FinancialRepository {
       throw error;
     }
   }
+  /** Read access requires a persistent active membership and active organization. */
+  hasActiveMembership(userId: string, organizationId: string): boolean {
+    if (!userId || !organizationId) return false;
+    const result = this.sql.prepare(`
+      SELECT EXISTS (
+        SELECT 1 FROM organization_memberships m
+        JOIN financial_organizations o ON o.id = m.organization_id
+        WHERE m.organization_id = ? AND m.user_id = ?
+          AND m.status = 'ACTIVE' AND o.status = 'ACTIVE'
+      ) AS authorized
+    `).get(organizationId, userId) as { authorized: number } | undefined;
+    return result?.authorized === 1;
+  }
+
+  /** Transaction access additionally requires the explicit can_transact flag. */
+  hasActiveTransactionMembership(userId: string, organizationId: string): boolean {
+    if (!userId || !organizationId) return false;
+    const result = this.sql.prepare(`
+      SELECT EXISTS (
+        SELECT 1 FROM organization_memberships m
+        JOIN financial_organizations o ON o.id = m.organization_id
+        WHERE m.organization_id = ? AND m.user_id = ?
+          AND m.status = 'ACTIVE' AND m.can_transact = 1
+          AND o.status = 'ACTIVE'
+      ) AS authorized
+    `).get(organizationId, userId) as { authorized: number } | undefined;
+    return result?.authorized === 1;
+  }
+
+  /** Revoke durably; schema v4 makes revocation terminal. */
+  revokeOrganizationMembership(userId: string, organizationId: string): boolean {
+    if (!userId || !organizationId) return false;
+    this.sql.exec('BEGIN IMMEDIATE');
+    try {
+      const result = this.sql.prepare(`
+        UPDATE organization_memberships
+        SET status = 'REVOKED', can_transact = 0
+        WHERE organization_id = ? AND user_id = ? AND status = 'ACTIVE'
+      `).run(organizationId, userId);
+      this.sql.exec('COMMIT');
+      return result.changes === 1;
+    } catch (error) {
+      try { this.sql.exec('ROLLBACK'); } catch { /* transaction may already have ended */ }
+      throw error;
+    }
+  }
 }
 
-let defaultRepository: FinancialRepository | undefined;
+let defaultRepository
+: FinancialRepository | undefined;
 
 /** Lazily open the persistent repository so tests can isolate database paths. */
 export function getFinancialRepository(): FinancialRepository {

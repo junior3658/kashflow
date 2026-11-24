@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 3;
+export const FINANCIAL_SCHEMA_VERSION = 4;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -30,6 +30,26 @@ CREATE TABLE IF NOT EXISTS organization_memberships (
 
 CREATE INDEX IF NOT EXISTS idx_organization_memberships_user
   ON organization_memberships(user_id, status);
+
+-- Revocation is terminal; rows cannot be deleted and reinserted to restore access.
+CREATE TRIGGER IF NOT EXISTS trg_membership_revocation_monotonic
+BEFORE UPDATE OF status, can_transact ON organization_memberships
+WHEN OLD.status = 'REVOKED' AND (NEW.status <> 'REVOKED' OR NEW.can_transact <> 0)
+BEGIN
+  SELECT RAISE(ABORT, 'revoked membership cannot be reactivated');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_membership_no_delete
+BEFORE DELETE ON organization_memberships
+BEGIN
+  SELECT RAISE(ABORT, 'organization memberships cannot be deleted; revoke instead');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_membership_identity_immutable
+BEFORE UPDATE OF organization_id, user_id, created_at ON organization_memberships
+BEGIN
+  SELECT RAISE(ABORT, 'organization membership identity is immutable');
+END;
 
 CREATE TABLE IF NOT EXISTS wallets (
   id TEXT PRIMARY KEY,

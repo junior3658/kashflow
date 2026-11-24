@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { db } from '../src/backend/db';
+import { getFinancialRepository } from '../src/backend/financial/repository';
 import { TransactionEngine } from '../src/backend/transactions';
 import { WalletService } from '../src/backend/wallets';
 
@@ -120,13 +122,74 @@ export async function testTransactionSafety() {
   } catch { businessWithoutMembershipContextRejected = true; }
   if (!businessWithoutMembershipContextRejected) throw new Error('A business wallet was accessed without explicit organization context.');
 
+  const membershipTestUserId = `usr_membership_${randomUUID()}`;
+  const membershipTestOrgId = `org_${membershipTestUserId}`;
+  const membershipTestWalletId = `wlt_${membershipTestOrgId}_usd`;
+  const membershipTestPersonalWalletId = `wlt_${membershipTestUserId}_usd`;
+  const membershipTestCreatedAt = new Date().toISOString();
+  const financialRepository = getFinancialRepository();
+  financialRepository.provisionPersonalWallets(membershipTestUserId, membershipTestCreatedAt);
+  financialRepository.provisionBusinessWallet(
+    membershipTestUserId, membershipTestOrgId, 'Membership authorization test', membershipTestCreatedAt,
+  );
+  db.users.set(membershipTestUserId, {
+    id: membershipTestUserId, email: `${membershipTestUserId}@example.test`,
+    fullName: 'Membership Test Owner', role: 'BUSINESS_OWNER',
+    currentOrgId: membershipTestOrgId, createdAt: membershipTestCreatedAt,
+  });
+  db.organizations.set(membershipTestOrgId, {
+    id: membershipTestOrgId, name: 'Membership authorization test',
+    ownerUserId: membershipTestUserId, currency: 'USD', status: 'ACTIVE',
+    createdAt: membershipTestCreatedAt,
+  });
+  db.memberships.set(`mem_${membershipTestUserId}`, {
+    id: `mem_${membershipTestUserId}`, orgId: membershipTestOrgId,
+    userId: membershipTestUserId, role: 'OWNER', permissions: ['ALL'],
+  });
+  db.wallets.set(membershipTestWalletId, {
+    id: membershipTestWalletId, ownerId: membershipTestOrgId, type: 'BUSINESS',
+    currency: 'USD', name: 'Membership Test Treasury', internalAccountingBalance: 0,
+    externalProviderBalance: 0, externalProviderBalanceStatus: 'NOT_SYNCED',
+    pendingDebits: 0, pendingCredits: 0, status: 'ACTIVE',
+    createdAt: membershipTestCreatedAt, updatedAt: membershipTestCreatedAt,
+  });
+  db.wallets.set(membershipTestPersonalWalletId, {
+    id: membershipTestPersonalWalletId, ownerId: membershipTestUserId, type: 'PERSONAL',
+    currency: 'USD', name: 'Membership Test Personal Wallet', internalAccountingBalance: 0,
+    externalProviderBalance: 0, externalProviderBalanceStatus: 'NOT_SYNCED',
+    pendingDebits: 0, pendingCredits: 0, status: 'ACTIVE',
+    createdAt: membershipTestCreatedAt, updatedAt: membershipTestCreatedAt,
+  });
   const authorizedBusinessDraft = TransactionEngine.createDraft({
-    userId, orgId: 'org_kashflow_corp', type: 'TRANSFER', sourceWalletId: 'wlt_business_usd',
-    destinationWalletId: sourceWalletId, amount: 100, currency: 'USD', provider: 'INTERNAL',
-    description: 'Authorized organization member access',
+    userId: membershipTestUserId, orgId: membershipTestOrgId, type: 'TRANSFER',
+    sourceWalletId: membershipTestWalletId, destinationWalletId: membershipTestPersonalWalletId,
+    amount: 100, currency: 'USD', provider: 'INTERNAL',
+    description: 'Authorized persistent organization member access',
   });
   TransactionEngine.cancelTransaction(authorizedBusinessDraft.id, 'Test cleanup');
-  console.log('✓ Organization wallet access requires an active organization and explicit membership permission.');
+
+  if (!financialRepository.revokeOrganizationMembership(membershipTestUserId, membershipTestOrgId)) {
+    throw new Error('Persistent membership revocation failed.');
+  }
+  let revokedMembershipAccessRejected = false;
+  try {
+    TransactionEngine.createDraft({
+      userId: membershipTestUserId, orgId: membershipTestOrgId, type: 'TRANSFER',
+      sourceWalletId: membershipTestWalletId, destinationWalletId: membershipTestPersonalWalletId,
+      amount: 100, currency: 'USD', provider: 'INTERNAL',
+      description: 'Revoked membership must not authorize a new draft',
+    });
+  } catch { revokedMembershipAccessRejected = true; }
+  if (!revokedMembershipAccessRejected) {
+    throw new Error('A revoked persistent organization membership still authorized a wallet draft.');
+  }
+  console.log('✓ Business-wallet access requires active persistent membership; revocation overrides runtime membership.');
+
+  db.users.delete(membershipTestUserId);
+  db.organizations.delete(membershipTestOrgId);
+  db.memberships.delete(`mem_${membershipTestUserId}`);
+  db.wallets.delete(membershipTestWalletId);
+  db.wallets.delete(membershipTestPersonalWalletId);
 
   let destinationOwnershipRejected = false;
   try {

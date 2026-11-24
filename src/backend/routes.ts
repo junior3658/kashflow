@@ -15,6 +15,7 @@ import { ProviderRouter } from './providers/router';
 import { AIOrchestrator } from './ai/orchestrator';
 import { SecurityAuditSuite } from './security/audit-scenarios';
 import { LedgerEngine } from './ledger';
+import { getFinancialRepository } from './financial/repository';
 import { LLMProvider } from './ai/llm-provider';
 import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
 import { enforceSameOriginWrites, requireAuth, readCookie } from './auth/middleware';
@@ -111,6 +112,10 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 apiRouter.get('/wallets', (req: Request, res: Response) => {
   const type = req.query.type as any;
   const user = db.users.get((req as any).userId)!;
+  if (type === 'BUSINESS' && (!user.currentOrgId ||
+      !getFinancialRepository().hasActiveMembership(user.id, user.currentOrgId))) {
+    return res.status(403).json({ error: 'Active organization membership is required to read business wallets.' });
+  }
   const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
   const wallets = WalletService.getWalletsByOwner(ownerId, type);
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);

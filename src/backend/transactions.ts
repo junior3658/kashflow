@@ -7,6 +7,7 @@ import { db } from './db';
 import { Transaction, TransactionStatus, TransactionType, Currency, Wallet } from './types';
 import { WalletService } from './wallets';
 import { LedgerEngine } from './ledger';
+import { getFinancialRepository } from './financial/repository';
 
 function canAccessWallet(wallet: Wallet, userId: string, orgId?: string): boolean {
   if (wallet.ownerId === userId) return true;
@@ -20,7 +21,7 @@ function canAccessWallet(wallet: Wallet, userId: string, orgId?: string): boolea
   );
   return Boolean(membership && (
     membership.permissions.includes('ALL') || membership.permissions.includes('TRANSACT')
-  ));
+  ) && getFinancialRepository().hasActiveTransactionMembership(userId, orgId));
 }
 
 export interface CreateDraftParams {

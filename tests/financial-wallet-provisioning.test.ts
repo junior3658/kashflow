@@ -71,6 +71,8 @@ export function testFinancialWalletProvisioning() {
     assert.equal(ownerMembership.role, 'OWNER');
     assert.equal(ownerMembership.status, 'ACTIVE');
     assert.equal(ownerMembership.can_transact, 1);
+    assert.equal(repository.hasActiveMembership('business-user', 'org_business-user'), true);
+    assert.equal(repository.hasActiveTransactionMembership('business-user', 'org_business-user'), true);
 
     const businessAccount = sql.prepare(
       'SELECT account_type, currency, wallet_id, balance_minor FROM ledger_accounts WHERE wallet_id = ?'
@@ -95,8 +97,17 @@ export function testFinancialWalletProvisioning() {
     assert.doesNotThrow(() => insertOrganizationTransaction('tx_org_owner', 'business-user'));
     assert.throws(() => insertOrganizationTransaction('tx_org_intruder', 'intruder-user'), /active organization membership/);
 
-    sql.prepare(`UPDATE organization_memberships SET status = 'REVOKED' WHERE organization_id = ? AND user_id = ?`)
-      .run('org_business-user', 'business-user');
+    assert.equal(repository.revokeOrganizationMembership('business-user', 'org_business-user'), true);
+    assert.equal(repository.revokeOrganizationMembership('business-user', 'org_business-user'), false);
+    assert.equal(repository.hasActiveMembership('business-user', 'org_business-user'), false);
+    assert.equal(repository.hasActiveTransactionMembership('business-user', 'org_business-user'), false);
+    assert.throws(() => sql.prepare(`
+      UPDATE organization_memberships SET status = 'ACTIVE', can_transact = 1
+      WHERE organization_id = ? AND user_id = ?
+    `).run('org_business-user', 'business-user'), /revoked membership cannot be reactivated/);
+    assert.throws(() => sql.prepare(`
+      DELETE FROM organization_memberships WHERE organization_id = ? AND user_id = ?
+    `).run('org_business-user', 'business-user'), /cannot be deleted/);
     assert.throws(() => insertOrganizationTransaction('tx_org_revoked', 'business-user'), /active organization membership/);
     assert.throws(() => repository.provisionBusinessWallet(
       'business-user', 'org_business-user', 'Example Business', createdAt,

@@ -5,6 +5,7 @@ export function testFinancialSqliteSchema() {
   console.log('--- RUNNING SQLITE FINANCIAL SCHEMA TESTS ---');
   const sql = openFinancialDatabase(':memory:');
   const now = new Date().toISOString();
+  assert.equal(Number(sql.pragma('user_version', { simple: true })), 4);
 
   const addWallet = (id: string, ownerId: string, balance: number) =>
     sql.prepare("INSERT INTO wallets (id, owner_type, owner_id, wallet_type, currency, name, internal_balance_minor, created_at, updated_at) VALUES (?, 'USER', ?, 'PERSONAL', 'USD', ?, ?, ?, ?)")
@@ -79,6 +80,13 @@ export function testFinancialSqliteSchema() {
       () => addTransaction({ id: 'tx-org-revoked', userId: 'user-a', orgId: 'org-a', sourceWalletId: 'wallet-org', destinationWalletId: null }),
       /active organization membership/,
     );
+    assert.throws(() => sql.prepare(`
+      UPDATE organization_memberships SET status = 'ACTIVE', can_transact = 1
+      WHERE organization_id = 'org-a' AND user_id = 'user-a'
+    `).run(), /revoked membership cannot be reactivated/);
+    assert.throws(() => sql.prepare(`
+      DELETE FROM organization_memberships WHERE organization_id = 'org-a' AND user_id = 'user-a'
+    `).run(), /cannot be deleted/);
     console.log('✓ Organization wallets require active membership and explicit transaction permission.');
 
     assert.throws(
