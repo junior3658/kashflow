@@ -220,8 +220,7 @@ export class FinancialRepository {
   }
 }
 
-let defaultRepository
-: FinancialRepository | undefined;
+let defaultRepository: FinancialRepository | undefined;
 
 /** Lazily open the persistent repository so tests can isolate database paths. */
 export function getFinancialRepository(): FinancialRepository {
