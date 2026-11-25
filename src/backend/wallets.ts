@@ -97,12 +97,12 @@ export class WalletService {
   /**
    * Get consolidated portfolio total in USD across all user wallets
    */
-  static getConsolidatedNetWorthUsd(ownerId: string): {
+  static getConsolidatedNetWorthUsd(ownerId: string, walletSource?: Wallet[]): {
     totalUsd: number;
     wallets: Wallet[];
     ratesUsed: Record<Currency, number>;
   } {
-    const userWallets = this.getWalletsByOwner(ownerId);
+    const userWallets = walletSource ?? this.getWalletsByOwner(ownerId);
     // Fixed standard benchmark conversion rates
     const rates: Record<Currency, number> = {
       USD: 1.0,

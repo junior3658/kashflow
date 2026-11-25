@@ -110,15 +110,31 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 // 2. WALLETS & BALANCES
 // -------------------------------------------------------------
 apiRouter.get('/wallets', (req: Request, res: Response) => {
-  const type = req.query.type as any;
-  const user = db.users.get((req as any).userId)!;
-  if (type === 'BUSINESS' && (!user.currentOrgId ||
-      !getFinancialRepository().hasActiveMembership(user.id, user.currentOrgId))) {
-    return res.status(403).json({ error: 'Active organization membership is required to read business wallets.' });
+  const type = req.query.type;
+  const userId = (req as any).userId as string;
+  const user = db.users.get(userId);
+  if (!user) return res.status(401).json({ error: 'Authenticated runtime user not found.' });
+  if (type !== undefined && type !== 'PERSONAL' && type !== 'BUSINESS') {
+    return res.status(400).json({ error: 'Wallet type must be PERSONAL or BUSINESS.' });
   }
-  const ownerId = type === 'BUSINESS' && user.currentOrgId ? user.currentOrgId : user.id;
-  const wallets = WalletService.getWalletsByOwner(ownerId, type);
-  const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId);
+  if (type === 'BUSINESS' && !user.currentOrgId) {
+    return res.status(403).json({ error: 'This account has no business organization.' });
+  }
+  const ownerType = type === 'BUSINESS' ? 'ORGANIZATION' as const : 'USER' as const;
+  const ownerId = type === 'BUSINESS' ? user.currentOrgId! : userId;
+  const walletType = type as 'PERSONAL' | 'BUSINESS' | undefined;
+  let wallets;
+  try {
+    wallets = getFinancialRepository().getWalletsByOwner(ownerType, ownerId, userId, walletType);
+  } catch (error) {
+    return res.status(403).json({ error: error instanceof Error ? error.message : 'Wallet access denied.' });
+  }
+  // Legacy demo data remains read-only fallback for personal accounts not provisioned
+  // in the financial database. Business wallets never fall back to the in-memory map.
+  if (type !== 'BUSINESS' && wallets.length === 0) {
+    wallets = WalletService.getWalletsByOwner(ownerId, walletType);
+  }
+  const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId, wallets);
   res.json({
     wallets,
     consolidatedNetWorthUsd: consolidated.totalUsd,

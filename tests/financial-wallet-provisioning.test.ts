@@ -49,6 +49,12 @@ export function testFinancialWalletProvisioning() {
     assert.equal((sql.prepare('SELECT COUNT(*) AS count FROM wallets WHERE owner_id = ?').get('user-b') as {count:number}).count, 3);
     assert.notDeepEqual(otherUser, first);
 
+    const personalRead = repository.getWalletsByOwner('USER', 'user-a', 'user-a', 'PERSONAL');
+    assert.equal(personalRead.length, 3);
+    assert.equal(personalRead.every((wallet) => wallet.ownerId === 'user-a' && wallet.type === 'PERSONAL'), true);
+    assert.equal(personalRead.every((wallet) => wallet.internalAccountingBalance === 0 && wallet.externalProviderBalanceStatus === 'NOT_SYNCED'), true);
+    assert.throws(() => repository.getWalletsByOwner('USER', 'user-a', 'user-b', 'PERSONAL'), /authenticated owner/);
+
     assert.throws(() => repository.provisionPersonalWallets('', createdAt), /owner ID/);
     repository.provisionPersonalWallets('business-user', createdAt);
     const businessWalletId = repository.provisionBusinessWallet(
@@ -88,6 +94,16 @@ export function testFinancialWalletProvisioning() {
     assert.equal((sql.prepare('SELECT COUNT(*) AS count FROM organization_memberships WHERE organization_id = ?').get('org_business-user') as {count:number}).count, 1);
     assert.equal((sql.prepare('SELECT COUNT(*) AS count FROM wallets WHERE owner_id = ?').get('org_business-user') as {count:number}).count, 1);
 
+    const businessRead = repository.getWalletsByOwner(
+      'ORGANIZATION', 'org_business-user', 'business-user', 'BUSINESS',
+    );
+    assert.equal(businessRead.length, 1);
+    assert.equal(businessRead[0].ownerId, 'org_business-user');
+    assert.equal(businessRead[0].internalAccountingBalance, 0);
+    assert.throws(() => repository.getWalletsByOwner(
+      'ORGANIZATION', 'org_business-user', 'intruder-user', 'BUSINESS',
+    ), /active organization membership/);
+
     const insertOrganizationTransaction = (id: string, userId: string) => sql.prepare(`
       INSERT INTO transactions (
         id, user_id, org_id, transaction_type, status, source_wallet_id, destination_wallet_id,
@@ -101,6 +117,9 @@ export function testFinancialWalletProvisioning() {
     assert.equal(repository.revokeOrganizationMembership('business-user', 'org_business-user'), false);
     assert.equal(repository.hasActiveMembership('business-user', 'org_business-user'), false);
     assert.equal(repository.hasActiveTransactionMembership('business-user', 'org_business-user'), false);
+    assert.throws(() => repository.getWalletsByOwner(
+      'ORGANIZATION', 'org_business-user', 'business-user', 'BUSINESS',
+    ), /active organization membership/);
     assert.throws(() => sql.prepare(`
       UPDATE organization_memberships SET status = 'ACTIVE', can_transact = 1
       WHERE organization_id = ? AND user_id = ?

@@ -1,4 +1,5 @@
 import { openFinancialDatabase, FinancialDatabase } from './schema';
+import type { Wallet, WalletType, Currency } from '../types';
 
 export type FinancialCurrency = 'USD' | 'EUR' | 'CDF';
 
@@ -172,6 +173,60 @@ export class FinancialRepository {
       throw error;
     }
   }
+  /** Read wallet projections from SQLite with requester-scoped ownership checks. */
+  getWalletsByOwner(
+    ownerType: 'USER' | 'ORGANIZATION',
+    ownerId: string,
+    requesterUserId: string,
+    walletType?: WalletType,
+  ): Wallet[] {
+    if (!ownerId || !requesterUserId) throw new Error('Wallet owner and authenticated requester are required.');
+    if (ownerType === 'USER' && ownerId !== requesterUserId) {
+      throw new Error('Personal wallet reads are restricted to the authenticated owner.');
+    }
+    if (ownerType === 'ORGANIZATION' && !this.hasActiveMembership(requesterUserId, ownerId)) {
+      throw new Error('Persistent active organization membership is required to read business wallets.');
+    }
+    if (walletType && !(['PERSONAL', 'BUSINESS', 'ESCROW', 'SETTLEMENT'] as string[]).includes(walletType)) {
+      throw new Error('Unsupported wallet type.');
+    }
+
+    const base = `
+      SELECT id, owner_id, wallet_type, currency, name,
+             internal_balance_minor, provider_balance_minor, provider_balance_status,
+             pending_debits_minor, pending_credits_minor, is_simulated,
+             status, created_at, updated_at
+      FROM wallets WHERE owner_type = ? AND owner_id = ?
+    `;
+    const rows = (walletType
+      ? this.sql.prepare(base + ' AND wallet_type = ? ORDER BY currency, id').all(ownerType, ownerId, walletType)
+      : this.sql.prepare(base + ' ORDER BY currency, id').all(ownerType, ownerId)) as Array<{
+        id: string; owner_id: string; wallet_type: string; currency: string; name: string;
+        internal_balance_minor: number; provider_balance_minor: number | null;
+        provider_balance_status: string; pending_debits_minor: number; pending_credits_minor: number;
+        is_simulated: number; status: string; created_at: string; updated_at: string;
+      }>;
+
+    return rows.map((row) => ({
+      id: row.id,
+      ownerId: row.owner_id,
+      type: row.wallet_type as WalletType,
+      currency: row.currency as Currency,
+      name: row.name,
+      internalAccountingBalance: row.internal_balance_minor,
+      // Zero is only a legacy UI sentinel; status remains NOT_SYNCED/STALE and
+      // must be checked before any provider amount is displayed as authoritative.
+      externalProviderBalance: row.provider_balance_minor ?? 0,
+      externalProviderBalanceStatus: row.provider_balance_status as Wallet['externalProviderBalanceStatus'],
+      pendingDebits: row.pending_debits_minor,
+      pendingCredits: row.pending_credits_minor,
+      isSimulated: row.is_simulated === 1,
+      status: row.status as Wallet['status'],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
   /** Read access requires a persistent active membership and active organization. */
   hasActiveMembership(userId: string, organizationId: string): boolean {
     if (!userId || !organizationId) return false;

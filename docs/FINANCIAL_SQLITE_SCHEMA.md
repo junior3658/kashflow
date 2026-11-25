@@ -67,3 +67,10 @@ Authentication now retries the idempotent runtime/financial provisioning when a 
 ## Version 4 — persistent organization-membership authorization
 
 Runtime business-wallet reads and internal-transfer authorization now consult the persistent organization membership table in addition to the existing runtime checks. Read access requires an active organization and active membership; transaction access also requires the explicit `can_transact` permission. Revocation is performed through a repository transaction and is terminal: revoked rows cannot be reactivated or deleted/reinserted to restore access. This is an authorization bridge only; financial balances, reservations, transaction state and posting remain map-backed until the repository cutover.
+
+
+## Incremental persistent wallet reads (November 2026)
+
+The authenticated wallet-read API now uses SQLite wallet projections for provisioned personal and business accounts. Repository reads require the authenticated owner for personal wallets and an active persistent membership for organization wallets. Business reads do not fall back to map-backed balances. Personal legacy/demo reads may fall back only when no persistent personal wallet rows are present. Consolidated net worth remains an estimate based solely on the internal wallet projection and fixed illustrative conversion rates; provider balances are never included and are displayed as authoritative only when their status is VERIFIED.
+
+This is a read cutover only. Reservation, debit/credit mutation, transaction state and ledger posting remain map-backed. A zero provider-balance value in the legacy Wallet interface is a display sentinel when provider balance is NULL; the provider status remains NOT_SYNCED and must not be interpreted as a verified provider balance.
