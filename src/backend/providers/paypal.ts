@@ -1,6 +1,10 @@
 /**
- * PayPal REST v2 Sandbox Adapter
- * Handles order creation, approval flow, order capture, and webhook signature verification.
+ * PayPal adapter boundary.
+ *
+ * The current project has no verified PayPal OAuth/order/capture integration or
+ * webhook verification contract. Every operation fails closed until those
+ * official specifications and the complete persistence/reconciliation flow are
+ * implemented. No placeholder credentials or simulated provider success are used.
  */
 
 import { Currency } from '../types';
@@ -22,77 +26,30 @@ export interface PayPalCaptureResponse {
 }
 
 export class PayPalSandboxAdapter {
-  private clientId: string;
-  private clientSecret: string;
-  private baseUrl: string;
-
-  constructor() {
-    this.clientId = process.env.PAYPAL_CLIENT_ID || 'sandbox_kashflow_client_id';
-    this.clientSecret = process.env.PAYPAL_CLIENT_SECRET || 'sandbox_kashflow_secret';
-    this.baseUrl = process.env.PAYPAL_BASE_URL || 'https://api-m.sandbox.paypal.com';
-  }
-
-  /**
-   * Create PayPal Order (Checkout Session)
-   */
-  async createOrder(params: {
+  async createOrder(_params: {
     amountCents: number;
     currency: Currency;
     description: string;
     customId?: string;
-  }): Promise<PayPalOrderResponse> {
-    const formattedAmount = (params.amountCents / 100).toFixed(2);
-    const orderId = `PAYPAL-ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    // Standard PayPal sandbox response contract
-    return {
-      orderId,
-      status: 'CREATED',
-      amount: params.amountCents,
-      currency: params.currency,
-      approvalUrl: `https://www.sandbox.paypal.com/checkoutnow?token=${orderId}`,
-    };
+  }): Promise<never> {
+    throw new Error('PayPal order creation is disabled: no verified OAuth and official order API integration is configured.');
   }
 
-  /**
-   * Capture an approved PayPal order
-   */
-  async captureOrder(orderId: string): Promise<PayPalCaptureResponse> {
-    if (!orderId || !orderId.startsWith('PAYPAL-ORD')) {
-      throw new Error(`Invalid PayPal order ID format: ${orderId}`);
-    }
-
-    const captureId = `PAYPAL-CAP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-
-    return {
-      captureId,
-      status: 'COMPLETED',
-      amount: 10000,
-      currency: 'USD',
-      createTime: new Date().toISOString(),
-    };
+  async captureOrder(_orderId: string): Promise<never> {
+    throw new Error('PayPal capture is disabled until order ownership, verified capture records, idempotency and atomic ledger settlement are implemented.');
   }
 
-  /**
-   * Verify Webhook Signature according to PayPal specification
-   */
-  async verifyWebhookSignature(headers: {
+  async verifyWebhookSignature(_headers: {
     transmissionId?: string;
     timestamp?: string;
     webhookId?: string;
     signature?: string;
     certUrl?: string;
-  }, body: any): Promise<{ isValid: boolean; reason?: string }> {
-    // PayPal requires these headers for cryptographic verification
-    if (!headers.transmissionId || !headers.signature) {
-      return { isValid: false, reason: 'Missing transmission-id or signature header.' };
-    }
-
-    if (headers.signature === 'invalid_signature_test') {
-      return { isValid: false, reason: 'Signature cryptographic check failed.' };
-    }
-
-    return { isValid: true };
+  }, _body: unknown): Promise<{ isValid: false; reason: string }> {
+    return {
+      isValid: false,
+      reason: 'PayPal webhook signature verification is not implemented; the event is rejected.',
+    };
   }
 }
 
