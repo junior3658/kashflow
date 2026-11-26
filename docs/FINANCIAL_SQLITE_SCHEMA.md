@@ -1,4 +1,4 @@
-# SQLite financial schema foundation (version 4)
+# SQLite financial schema foundation (version 5)
 
 ## Scope of this change
 
@@ -74,3 +74,17 @@ Runtime business-wallet reads and internal-transfer authorization now consult th
 The authenticated wallet-read API now uses SQLite wallet projections for provisioned personal and business accounts. Repository reads require the authenticated owner for personal wallets and an active persistent membership for organization wallets. Business reads do not fall back to map-backed balances. Personal legacy/demo reads may fall back only when no persistent personal wallet rows are present. Consolidated net worth remains an estimate based solely on the internal wallet projection and fixed illustrative conversion rates; provider balances are never included and are displayed as authoritative only when their status is VERIFIED.
 
 This is a read cutover only. Reservation, debit/credit mutation, transaction state and ledger posting remain map-backed. A zero provider-balance value in the legacy Wallet interface is a display sentinel when provider balance is NULL; the provider status remains NOT_SYNCED and must not be interpreted as a verified provider balance.
+
+
+## Version 5 — transaction-time tenant and ledger-account guards
+
+Version 5 closes four database-level gaps discovered during the persistent-ledger audit:
+
+- A transaction revalidates its source wallet, optional destination wallet, and active organization membership when entering `PENDING` or `PROCESSING`. Revocation after draft creation therefore blocks a later reservation or processing transition.
+- New wallet reservations must start in `ACTIVE`. Directly inserting a `CONSUMED` or `RELEASED` reservation can no longer increase the pending-debit projection without a corresponding lifecycle transition.
+- A ledger batch currency must equal the immutable transaction currency.
+- A ledger entry linked to a wallet may reference only a wallet owned by the transaction user or by the transaction organization with a currently active `can_transact` membership. Shared system accounts with no wallet link remain available for clearing and platform accounting.
+
+These are SQLite guardrails, not a completed financial-service migration. The existing transaction engine, reservation lifecycle and ledger posting are still map-backed; the repository has not yet made SQLite the sole operational source of truth. The next phase must move draft creation, idempotency, reservation and state transitions into repository transactions, then post ledger entries and wallet projections atomically.
+
+No provider settlement is enabled by this schema change. Cryptographic webhook verification and independent provider reconciliation remain application-level prerequisites; Shwary and PayPal endpoints and capabilities must not be inferred.
