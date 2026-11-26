@@ -307,6 +307,16 @@ BEGIN
   SELECT RAISE(ABORT, 'provider reconciliation result is immutable');
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_ledger_batches_validate_insert
+BEFORE INSERT ON ledger_batches
+WHEN NOT EXISTS (
+  SELECT 1 FROM transactions t
+  WHERE t.id = NEW.transaction_id AND t.currency = NEW.currency
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ledger batch currency must match its transaction currency');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_ledger_batches_insert_unposted
 BEFORE INSERT ON ledger_batches
 WHEN NEW.posted_at IS NOT NULL
@@ -366,6 +376,43 @@ BEGIN
   ) THEN RAISE(ABORT, 'destination wallet is outside the transaction tenant or inactive') END;
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_transactions_revalidate_tenant_transition
+BEFORE UPDATE OF status ON transactions
+WHEN NEW.status IN ('PENDING', 'PROCESSING')
+BEGIN
+  SELECT CASE WHEN NEW.org_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM organization_memberships m
+    JOIN financial_organizations o ON o.id = m.organization_id
+    WHERE m.organization_id = NEW.org_id
+      AND m.user_id = NEW.user_id
+      AND m.status = 'ACTIVE'
+      AND m.can_transact = 1
+      AND o.status = 'ACTIVE'
+  ) THEN RAISE(ABORT, 'transaction user lacks active organization membership at state transition') END;
+
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM wallets w
+    WHERE w.id = NEW.source_wallet_id
+      AND w.currency = NEW.currency
+      AND w.status = 'ACTIVE'
+      AND (
+        (w.owner_type = 'USER' AND w.owner_id = NEW.user_id)
+        OR (w.owner_type = 'ORGANIZATION' AND NEW.org_id IS NOT NULL AND w.owner_id = NEW.org_id)
+      )
+  ) THEN RAISE(ABORT, 'source wallet is outside the transaction tenant or inactive at state transition') END;
+
+  SELECT CASE WHEN NEW.destination_wallet_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM wallets w
+    WHERE w.id = NEW.destination_wallet_id
+      AND w.currency = NEW.currency
+      AND w.status = 'ACTIVE'
+      AND (
+        (w.owner_type = 'USER' AND w.owner_id = NEW.user_id)
+        OR (w.owner_type = 'ORGANIZATION' AND NEW.org_id IS NOT NULL AND w.owner_id = NEW.org_id)
+      )
+  ) THEN RAISE(ABORT, 'destination wallet is outside the transaction tenant or inactive at state transition') END;
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_transactions_financial_fields_immutable
 BEFORE UPDATE OF user_id, org_id, transaction_type, source_wallet_id, destination_wallet_id,
   amount_minor, fee_minor, currency, provider ON transactions
@@ -418,6 +465,9 @@ END;
 CREATE TRIGGER IF NOT EXISTS trg_reservations_validate_insert
 BEFORE INSERT ON wallet_reservations
 BEGIN
+  SELECT CASE WHEN NEW.status <> 'ACTIVE'
+    THEN RAISE(ABORT, 'new wallet reservations must start ACTIVE') END;
+
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM transactions t
     WHERE t.id = NEW.transaction_id
@@ -513,6 +563,45 @@ WHEN NEW.reconciliation_status = 'MATCHED'
   )
 BEGIN
   SELECT RAISE(ABORT, 'provider event cannot be matched without verified confirmed amount and currency evidence');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_tenant_scope
+BEFORE INSERT ON ledger_entries
+WHEN NOT EXISTS (
+  SELECT 1
+  FROM ledger_batches b
+  JOIN transactions t ON t.id = b.transaction_id
+  JOIN ledger_accounts a ON a.id = NEW.account_id
+  LEFT JOIN wallets w ON w.id = a.wallet_id
+  WHERE b.id = NEW.batch_id
+    AND b.currency = NEW.currency
+    AND t.currency = NEW.currency
+    AND (
+      a.wallet_id IS NULL
+      OR (
+        w.status = 'ACTIVE'
+        AND (
+          (w.owner_type = 'USER' AND w.owner_id = t.user_id)
+          OR (
+            w.owner_type = 'ORGANIZATION'
+            AND t.org_id = w.owner_id
+            AND EXISTS (
+              SELECT 1
+              FROM organization_memberships m
+              JOIN financial_organizations o ON o.id = m.organization_id
+              WHERE m.organization_id = t.org_id
+                AND m.user_id = t.user_id
+                AND m.status = 'ACTIVE'
+                AND m.can_transact = 1
+                AND o.status = 'ACTIVE'
+            )
+          )
+        )
+      )
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'ledger account is outside the transaction tenant or inactive');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_insert_unposted
