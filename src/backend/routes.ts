@@ -7,7 +7,6 @@ import { Router, Request, Response } from 'express';
 import { db } from './db';
 import { WalletService } from './wallets';
 import { TransactionEngine } from './transactions';
-import { paypalAdapter } from './providers/paypal';
 import { shwaryAdapter } from './providers/shwary';
 import { CurrencyExchangeService } from './providers/exchange';
 import { CryptoSimulationService } from './providers/crypto';
