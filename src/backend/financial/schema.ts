@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 4;
+export const FINANCIAL_SCHEMA_VERSION = 5;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
