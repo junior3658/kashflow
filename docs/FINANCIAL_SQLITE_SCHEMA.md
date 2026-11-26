@@ -1,4 +1,4 @@
-# SQLite financial schema foundation (version 5)
+# SQLite financial schema foundation (version 6)
 
 ## Scope of this change
 
@@ -88,3 +88,10 @@ Version 5 closes four database-level gaps discovered during the persistent-ledge
 These are SQLite guardrails, not a completed financial-service migration. The existing transaction engine, reservation lifecycle and ledger posting are still map-backed; the repository has not yet made SQLite the sole operational source of truth. The next phase must move draft creation, idempotency, reservation and state transitions into repository transactions, then post ledger entries and wallet projections atomically.
 
 No provider settlement is enabled by this schema change. Cryptographic webhook verification and independent provider reconciliation remain application-level prerequisites; Shwary and PayPal endpoints and capabilities must not be inferred.
+
+
+## Version 6 — safe reversals after membership revocation
+
+A posted organization transaction may need an accounting reversal after the initiating member's access has been revoked. Version 6 keeps new `POSTING` entries subject to current tenant authorization, but permits a `REVERSAL` entry against a wallet-linked account only when that exact account, currency, amount and opposite debit/credit direction exist in the already-posted original batch for the same transaction. The existing reversal-posting trigger still verifies the complete inverse multiset before any projection is updated.
+
+This preserves the `REFUNDED` lifecycle without reopening the revoked membership or allowing a reversal to redirect funds to a different tenant. It is an accounting correction path, not renewed user authorization.
