@@ -67,3 +67,16 @@ This is a containment and hardening phase, **not** the SQLite financial-core mig
 
 
 The `POST /transfers/draft` API now requires an explicit destination wallet ID and rejects external beneficiary account strings. The generic transfer endpoint is strictly wallet-to-wallet; provider payouts remain disabled until a verified provider workflow is implemented.
+
+
+## Provider boundary and persistent-ledger guard hardening — 26 November 2026
+
+- The PayPal adapter no longer supplies placeholder credentials, synthetic order IDs, fake capture success or a permissive placeholder webhook verifier. Order creation and capture fail closed; webhook verification always returns `isValid: false` until real cryptographic verification and reconciliation are implemented.
+- PayPal API routes remain disabled with HTTP 503 responses.
+- Shwary collection HTTP 2xx remains only `PENDING_PROVIDER_CONFIRMATION`; the response body is not treated as settlement evidence and does not mutate a wallet.
+- Shwary B2C payout, merchant-balance retrieval and reuse of collected funds remain disabled because the required official endpoint/permission contracts are not verified.
+- SQLite schema v5 revalidates tenant membership and wallet ownership at PENDING/PROCESSING transitions, requires reservations to start ACTIVE, matches ledger-batch currency to transaction currency, and restricts wallet-linked ledger entries to the transaction tenant.
+- SQLite schema v6 permits a wallet-linked reversal after membership revocation only when each reversal line exactly mirrors an already-posted line of the same transaction; the complete inverse is still checked before posting. This preserves the REFUNDED correction path without restoring the revoked membership.
+- Regression tests cover cross-tenant ledger entry rejection, reservation initial state, transaction/batch currency match, revocation races, exact post-revocation reversals, PayPal fail-closed behavior and Shwary HTTP 2xx non-settlement.
+
+These changes harden database/provider boundaries but do not yet migrate the application transaction engine, reservation lifecycle or ledger posting from Maps to SQLite. The current branch head still requires an observed CI run before the latest commits can be called validated.
