@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 5;
+export const FINANCIAL_SCHEMA_VERSION = 6;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -565,6 +565,7 @@ BEGIN
   SELECT RAISE(ABORT, 'provider event cannot be matched without verified confirmed amount and currency evidence');
 END;
 
+DROP TRIGGER IF EXISTS trg_ledger_entries_tenant_scope;
 CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_tenant_scope
 BEFORE INSERT ON ledger_entries
 WHEN NOT EXISTS (
@@ -579,7 +580,25 @@ WHEN NOT EXISTS (
     AND (
       a.wallet_id IS NULL
       OR (
-        w.status = 'ACTIVE'
+        b.batch_type = 'REVERSAL'
+        AND EXISTS (
+          SELECT 1
+          FROM ledger_batches original
+          JOIN ledger_entries original_entry ON original_entry.batch_id = original.id
+          WHERE original.id = b.reversal_of_batch_id
+            AND original.transaction_id = b.transaction_id
+            AND original.batch_type = 'POSTING'
+            AND original.posted_at IS NOT NULL
+            AND original_entry.account_id = NEW.account_id
+            AND original_entry.currency = NEW.currency
+            AND original_entry.amount_minor = NEW.amount_minor
+            AND original_entry.entry_type = CASE NEW.entry_type
+              WHEN 'DEBIT' THEN 'CREDIT' ELSE 'DEBIT' END
+        )
+      )
+      OR (
+        b.batch_type = 'POSTING'
+        AND w.status = 'ACTIVE'
         AND (
           (w.owner_type = 'USER' AND w.owner_id = t.user_id)
           OR (
