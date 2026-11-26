@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { openFinancialDatabase } from '../src/backend/financial/schema';
+import { FINANCIAL_SCHEMA_VERSION, openFinancialDatabase } from '../src/backend/financial/schema';
 
 export function testFinancialSqliteSchema() {
   console.log('--- RUNNING SQLITE FINANCIAL SCHEMA TESTS ---');
   const sql = openFinancialDatabase(':memory:');
   const now = new Date().toISOString();
-  assert.equal(Number(sql.pragma('user_version', { simple: true })), 4);
+  assert.equal(Number(sql.pragma('user_version', { simple: true })), FINANCIAL_SCHEMA_VERSION);
 
   const addWallet = (id: string, ownerId: string, balance: number) =>
     sql.prepare("INSERT INTO wallets (id, owner_type, owner_id, wallet_type, currency, name, internal_balance_minor, created_at, updated_at) VALUES (?, 'USER', ?, 'PERSONAL', 'USD', ?, ?, ?, ?)")
@@ -95,6 +95,30 @@ export function testFinancialSqliteSchema() {
     );
     console.log('✓ SQL tenant trigger rejects another user wallet.');
 
+    addTransaction({
+      id: 'tx-org-inflight', userId: 'user-c', orgId: 'org-a',
+      sourceWalletId: 'wallet-org', destinationWalletId: null, amount: 25,
+    });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-org-inflight'").run();
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-org-inflight', 'wallet-org', 'USD', 25, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'PROCESSING' WHERE id = 'tx-org-inflight'").run();
+
+    addTransaction({
+      id: 'tx-org-transition-revoked', userId: 'user-c', orgId: 'org-a',
+      sourceWalletId: 'wallet-org', destinationWalletId: null,
+    });
+    sql.prepare("UPDATE organization_memberships SET status = 'REVOKED', can_transact = 0 WHERE organization_id = 'org-a' AND user_id = 'user-c'").run();
+    addBatch('batch-org-revoked', 'tx-org-inflight', 'POSTING', 25);
+    assert.throws(
+      () => addEntry('entry-org-revoked', 'batch-org-revoked', 'account-wallet-org', 'DEBIT', 25),
+      /outside the transaction tenant or inactive/,
+    );
+    assert.throws(
+      () => sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-org-transition-revoked'").run(),
+      /active organization membership at state transition/,
+    );
+    console.log('✓ Revoked memberships block both pending transitions and in-flight organization ledger postings.');
+
     addTransaction({ id: 'tx-overdraw', destinationWalletId: null, amount: 10001 });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-overdraw'").run();
     assert.throws(
@@ -103,6 +127,32 @@ export function testFinancialSqliteSchema() {
     );
     sql.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = 'tx-overdraw'").run();
     console.log('✓ SQLite refuses reservations above the available wallet balance.');
+
+    addTransaction({ id: 'tx-reservation-initial-state', destinationWalletId: null, amount: 50 });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-reservation-initial-state'").run();
+    const insertNonActiveReservation = (status: 'CONSUMED' | 'RELEASED') => sql.prepare(
+      "INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-reservation-initial-state', 'wallet-a', 'USD', 50, ?, ?, ?)"
+    ).run(status, now, now);
+    assert.throws(() => insertNonActiveReservation('CONSUMED'), /must start ACTIVE/);
+    assert.throws(() => insertNonActiveReservation('RELEASED'), /must start ACTIVE/);
+    const pendingAfterRejectedInserts = (sql.prepare(
+      "SELECT pending_debits_minor FROM wallets WHERE id = 'wallet-a'"
+    ).get() as { pending_debits_minor: number }).pending_debits_minor;
+    assert.equal(pendingAfterRejectedInserts, 0);
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-reservation-initial-state', 'wallet-a', 'USD', 50, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'CANCELLED' WHERE id = 'tx-reservation-initial-state'").run();
+    const pendingAfterCancellation = (sql.prepare(
+      "SELECT pending_debits_minor FROM wallets WHERE id = 'wallet-a'"
+    ).get() as { pending_debits_minor: number }).pending_debits_minor;
+    assert.equal(pendingAfterCancellation, 0);
+    console.log('✓ Reservations must start ACTIVE; cancellation releases the exact pending projection.');
+
+    addTransaction({ id: 'tx-currency-mismatch' });
+    assert.throws(
+      () => sql.prepare("INSERT INTO ledger_batches (id, transaction_id, batch_type, currency, total_debits_minor, total_credits_minor, created_at) VALUES ('batch-currency-mismatch', 'tx-currency-mismatch', 'POSTING', 'EUR', 100, 100, ?)").run(now),
+      /currency must match its transaction currency/,
+    );
+    console.log('✓ Ledger batches cannot post in a currency different from their transaction.');
 
     addTransaction({ id: 'tx-internal' });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-internal'").run();
@@ -227,6 +277,18 @@ export function testFinancialSqliteSchema() {
       /invalid transaction status transition/,
     );
     console.log('✓ Cancellation releases reservations and terminal states cannot be reopened.');
+
+    addTransaction({ id: 'tx-ledger-cross-tenant', amount: 100 });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-ledger-cross-tenant'").run();
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-ledger-cross-tenant', 'wallet-a', 'USD', 100, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'PROCESSING' WHERE id = 'tx-ledger-cross-tenant'").run();
+    addBatch('batch-ledger-cross-tenant', 'tx-ledger-cross-tenant', 'POSTING', 100);
+    addEntry('entry-ledger-cross-tenant-debit', 'batch-ledger-cross-tenant', 'account-wallet-a', 'DEBIT', 100);
+    assert.throws(
+      () => addEntry('entry-ledger-cross-tenant-credit', 'batch-ledger-cross-tenant', 'account-wallet-other', 'CREDIT', 100),
+      /outside the transaction tenant or inactive/,
+    );
+    console.log('✓ Ledger entries cannot debit or credit a wallet owned by another tenant.');
   } finally {
     sql.close();
   }
