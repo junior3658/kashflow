@@ -119,6 +119,32 @@ export function testFinancialSqliteSchema() {
     );
     console.log('✓ Revoked memberships block both pending transitions and in-flight organization ledger postings.');
 
+    sql.prepare("INSERT INTO organization_memberships(organization_id, user_id, role, status, can_transact, created_at) VALUES('org-a', 'user-d', 'OWNER', 'ACTIVE', 1, ?)").run(now);
+    addTransaction({
+      id: 'tx-org-refund-after-revocation', userId: 'user-d', orgId: 'org-a',
+      sourceWalletId: 'wallet-org', destinationWalletId: null, amount: 30,
+    });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-org-refund-after-revocation'").run();
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-org-refund-after-revocation', 'wallet-org', 'USD', 30, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'PROCESSING' WHERE id = 'tx-org-refund-after-revocation'").run();
+    addBatch('batch-org-original', 'tx-org-refund-after-revocation', 'POSTING', 30);
+    addEntry('entry-org-original-debit', 'batch-org-original', 'account-wallet-org', 'DEBIT', 30);
+    addEntry('entry-org-original-credit', 'batch-org-original', 'account-cash', 'CREDIT', 30);
+    sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-org-original'").run(now);
+    sql.prepare("UPDATE transactions SET status = 'SUCCEEDED' WHERE id = 'tx-org-refund-after-revocation'").run();
+
+    sql.prepare("UPDATE organization_memberships SET status = 'REVOKED', can_transact = 0 WHERE organization_id = 'org-a' AND user_id = 'user-d'").run();
+    sql.prepare("INSERT INTO ledger_batches (id, transaction_id, batch_type, currency, total_debits_minor, total_credits_minor, reversal_of_batch_id, created_at) VALUES ('batch-org-reversal', 'tx-org-refund-after-revocation', 'REVERSAL', 'USD', 30, 30, 'batch-org-original', ?)").run(now);
+    addEntry('entry-org-reversal-debit', 'batch-org-reversal', 'account-cash', 'DEBIT', 30);
+    addEntry('entry-org-reversal-credit', 'batch-org-reversal', 'account-wallet-org', 'CREDIT', 30);
+    sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-org-reversal'").run(now);
+    sql.prepare("UPDATE transactions SET status = 'REFUNDED' WHERE id = 'tx-org-refund-after-revocation'").run();
+    const orgBalanceAfterRefund = sql.prepare(
+      "SELECT internal_balance_minor FROM wallets WHERE id = 'wallet-org'"
+    ).get() as { internal_balance_minor: number };
+    assert.equal(orgBalanceAfterRefund.internal_balance_minor, 10000);
+    console.log('✓ Exact ledger reversal remains possible after membership revocation and restores the organization wallet.');
+
     addTransaction({ id: 'tx-overdraw', destinationWalletId: null, amount: 10001 });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-overdraw'").run();
     assert.throws(
