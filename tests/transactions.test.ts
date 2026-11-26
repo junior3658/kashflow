@@ -3,6 +3,8 @@ import { db } from '../src/backend/db';
 import { getFinancialRepository } from '../src/backend/financial/repository';
 import { TransactionEngine } from '../src/backend/transactions';
 import { WalletService } from '../src/backend/wallets';
+import { paypalAdapter } from '../src/backend/providers/paypal';
+import { ShwaryAdapter } from '../src/backend/providers/shwary';
 
 export async function testTransactionSafety() {
   console.log('--- RUNNING TRANSACTION SAFETY TESTS ---');
@@ -257,4 +259,93 @@ export async function testTransactionSafety() {
   console.log('✓ Internal/provider balance separation check passed.');
 
   db.wallets.delete(destinationWalletId);
+
+  const paypalVerification = await paypalAdapter.verifyWebhookSignature({
+    transmissionId: 'test-transmission',
+    timestamp: new Date().toISOString(),
+    webhookId: 'test-webhook-id',
+    signature: 'syntactically-present-but-not-verified',
+    certUrl: 'https://api.paypal.com/certs/test',
+  }, { event_type: 'PAYMENT.CAPTURE.COMPLETED' });
+  if (paypalVerification.isValid) {
+    throw new Error('PayPal webhook verifier accepted headers without cryptographic verification.');
+  }
+
+  let paypalOrderDisabled = false;
+  try {
+    await paypalAdapter.createOrder({ amountCents: 1000, currency: 'USD', description: 'Disabled adapter test' });
+  } catch (error) {
+    paypalOrderDisabled = error instanceof Error && error.message.includes('disabled');
+  }
+  if (!paypalOrderDisabled) throw new Error('PayPal adapter returned a simulated order instead of failing closed.');
+
+  let paypalCaptureDisabled = false;
+  try { await paypalAdapter.captureOrder('PAYPAL-ORD-test'); }
+  catch (error) {
+    paypalCaptureDisabled = error instanceof Error && error.message.includes('disabled');
+  }
+  if (!paypalCaptureDisabled) throw new Error('PayPal adapter returned a simulated capture instead of failing closed.');
+  console.log('✓ PayPal order creation, capture and unimplemented webhook verification all fail closed.');
+
+  const shwaryEnvKeys = [
+    'SHWARY_MERCHANT_ID', 'SHWARY_MERCHANT_KEY', 'SHWARY_BASE_URL',
+    'SHWARY_MODE', 'SHWARY_CALLBACK_URL',
+  ] as const;
+  const previousShwaryEnv: Record<string, string | undefined> = {};
+  for (const key of shwaryEnvKeys) previousShwaryEnv[key] = process.env[key];
+  const previousFetch = globalThis.fetch;
+  const providerBoundaryBalance = db.wallets.get(sourceWalletId)!.internalAccountingBalance;
+
+  try {
+    process.env.SHWARY_MERCHANT_ID = 'test-merchant';
+    process.env.SHWARY_MERCHANT_KEY = 'test-key-not-used-outside-mocked-fetch';
+    process.env.SHWARY_BASE_URL = 'https://shwary.test';
+    process.env.SHWARY_MODE = 'sandbox';
+    delete process.env.SHWARY_CALLBACK_URL;
+
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ status: 'COMPLETED', amount: 100 }),
+    } as Response);
+
+    const shwary = new ShwaryAdapter();
+    const accepted = await shwary.requestEncashment({
+      amountCents: 10000,
+      currency: 'CDF',
+      customerPhone: '+243810000000',
+    });
+    if (accepted.status !== 'PENDING_PROVIDER_CONFIRMATION') {
+      throw new Error('A Shwary HTTP 2xx response was incorrectly treated as final provider settlement.');
+    }
+
+    const capabilities = shwary.getCapabilities();
+    if (capabilities.b2cPayouts.integrationReady || capabilities.merchantBalance.integrationReady ||
+        capabilities.reusedCollectedFunds.supported) {
+      throw new Error('Undocumented Shwary payout, merchant-balance or collected-fund reuse capability was enabled.');
+    }
+
+    let payoutDisabled = false;
+    try { await shwary.executePayout(); }
+    catch (error) { payoutDisabled = error instanceof Error && error.message.includes('not enabled'); }
+    if (!payoutDisabled) throw new Error('Shwary payout was not blocked.');
+
+    let merchantBalanceDisabled = false;
+    try { await shwary.getMerchantBalance(); }
+    catch (error) { merchantBalanceDisabled = error instanceof Error && error.message.includes('not enabled'); }
+    if (!merchantBalanceDisabled) throw new Error('Shwary merchant balance was not blocked.');
+
+    if (db.wallets.get(sourceWalletId)!.internalAccountingBalance !== providerBoundaryBalance) {
+      throw new Error('A provider HTTP 2xx response changed an internal wallet balance.');
+    }
+    console.log('✓ Shwary HTTP 2xx remains PENDING_PROVIDER_CONFIRMATION and cannot credit a wallet.');
+    console.log('✓ Shwary payouts, merchant balance and collected-fund reuse remain disabled.');
+  } finally {
+    globalThis.fetch = previousFetch;
+    for (const key of shwaryEnvKeys) {
+      const previous = previousShwaryEnv[key];
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
+  }
 }
