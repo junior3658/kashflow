@@ -225,13 +225,17 @@ export function testFinancialSqliteSchema() {
     sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-reversal-check'").run(now);
     sql.prepare("UPDATE transactions SET status = 'SUCCEEDED' WHERE id = 'tx-reversal-check'").run();
     addBatch('batch-reversal-check-invalid', 'tx-reversal-check', 'REVERSAL', 99, 'batch-reversal-check');
-    addEntry('entry-reversal-check-invalid-debit', 'batch-reversal-check-invalid', 'account-wallet-b', 'DEBIT', 99);
-    addEntry('entry-reversal-check-invalid-credit', 'batch-reversal-check-invalid', 'account-wallet-a', 'CREDIT', 99);
+    // Schema v6 rejects a non-matching reversal line at insertion time, before
+    // an invalid entry can remain in an unposted batch.
     assert.throws(
-      () => sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-reversal-check-invalid'").run(now),
-      /exactly invert the original posted batch/,
+      () => addEntry('entry-reversal-check-invalid-debit', 'batch-reversal-check-invalid', 'account-wallet-b', 'DEBIT', 99),
+      /ledger account is outside the transaction tenant or inactive/,
     );
-    console.log('✓ A reversal must exactly invert every original ledger line.');
+    const invalidReversalPostedAt = (sql.prepare(
+      "SELECT posted_at FROM ledger_batches WHERE id = 'batch-reversal-check-invalid'"
+    ).get() as { posted_at: string | null }).posted_at;
+    assert.equal(invalidReversalPostedAt, null);
+    console.log('✓ A reversal must exactly invert every original ledger line before insertion.');
 
     addTransaction({ id: 'tx-unbalanced', destinationWalletId: null, amount: 100 });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-unbalanced'").run();
