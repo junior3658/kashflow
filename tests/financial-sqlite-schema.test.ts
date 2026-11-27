@@ -18,7 +18,7 @@ export function testFinancialSqliteSchema() {
   const addTransaction = (input: {
     id: string;
     userId?: string;
-    provider?: 'INTERNAL' | 'PAYPAL' | 'SHWARY;
+    provider?: 'INTERNAL' | 'PAYPAL' | 'SHWARY';
     orgId?: string;
     status?: 'CREATED' | 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
     sourceWalletId?: string;
