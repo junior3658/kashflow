@@ -116,3 +116,12 @@ This preserves the `REFUNDED` lifecycle without reopening the revoked membership
 - The legacy in-memory idempotency map is never allowed to shadow a request whose wallets are persistent. If the same user/key already exists in the legacy map, the persistent request fails closed and requires a new key; the map-backed idempotency fingerprint also includes description and metadata.
 - Seeded in-memory demo wallets are explicitly marked `isSimulated = true`. Wallet APIs identify simulated demo balances separately from estimated values based on persistent internal-ledger projections. Missing provenance is surfaced as legacy/unverified rather than silently treated as persistent.
 - The personal and business wallet interfaces display SIMULATED, PERSISTENT or UNVERIFIED provenance. A simulated business workspace labels its other illustrative dashboard metrics as demo data as well.
+
+
+## Exact API amounts and idempotent internal retries — 27 November 2026
+
+- The internal transfer API accepts USD amounts as decimal strings with at most two fractional digits and converts them directly to integer cents. It rejects floating-point JSON numbers, excess precision, exponent notation, zero, negatives and values outside JavaScript's safe-integer range; it does not multiply a binary floating-point value and round it.
+- Persistent internal transfers require a caller-supplied idempotency key. The key is unique per authenticated user and bound to a canonical request fingerprint.
+- Repeating confirmation after a committed SUCCEEDED transfer returns the already-settled transaction only when its posted POSTING batch exists; it does not create another batch.
+- Repeating cancellation after CANCELLED returns the existing terminal transaction only when no active reservation remains.
+- These guarantees apply to the provisioned persistent internal-transfer path. Legacy map-backed demo flows remain a separate compatibility path and are not suitable for real settlement.
