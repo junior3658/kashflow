@@ -28,13 +28,19 @@ Never commit `.env`, the SQLite database, or provider credentials.
 
 The server requires Node.js 22.13 or newer because the dependency set and build toolchain target modern Node runtimes.
 
-## Important prototype boundaries
+## Current persistence and authorization boundary (27 November 2026)
 
-**Only authentication records are persisted in SQLite.** Wallets, ledger entries, transactions, crypto simulation state, audit data and parts of the application domain are still in-memory. They reset on server restart and are not yet a durable financial system. A user created through this flow receives empty prototype USD, EUR and CDF wallets; no real or demo funds are credited.
+Authentication and financial data use separate SQLite files. Verified users receive zero-balance personal USD/EUR/CDF wallets and, for eligible BUSINESS accounts, a zero-balance USD organization wallet with a persistent OWNER membership and linked liability accounts. No seeded/demo balances are imported into these persistent wallets.
 
-This branch does not certify the financial engine for multi-user production use. Before any real-money use, move the entire financial domain into a transactional database, enforce tenant-scoped queries at the data layer, add migrations and concurrency controls, and test every authorization boundary.
+The provisioned-wallet internal transfer path is now persistent for **zero-fee USD wallet-to-wallet transfers**. Draft intent and per-user idempotency records are inserted atomically; the PENDING transition and reservation share a SQL transaction; PROCESSING, the balanced debit/credit ledger batch, wallet/account projections, reservation consumption and SUCCEEDED are committed together. Cancellation releases an active reservation transactionally. Exact USD decimal strings are converted directly to integer cents. Restart and competing-connection tests cover durability and double-reservation prevention.
 
-The Shwary callback remains deliberately unverified and cannot settle funds. PayPal remains a mock adapter unless separately implemented and tested.
+Business membership is revalidated by SQLite at transaction transitions and ledger posting. A terminally revoked or unavailable business workspace is not recreated during login: personal authentication remains available, but the runtime organization context and public organization identifier are withheld. Read access and transaction permission remain distinct.
+
+The migration is still partial. Seeded demo wallets and legacy in-memory transaction paths remain for prototype compatibility; EUR/CDF transfer settlement, non-zero fees, persistent refund/reversal orchestration, provider-event verification, provider reconciliation, and live Shwary/PayPal settlement are not enabled. The seven transaction statuses remain represented in the schema, but this does not mean every provider lifecycle is operational.
+
+The Shwary callback remains a no-op acknowledgement without cryptographic verification and cannot settle funds. Shwary payouts and merchant-balance reads remain disabled. PayPal order creation, capture and webhook verification fail closed. HTTP 2xx responses and LLM output are never settlement evidence.
+
+This branch is **not certified for production real-money use**. Do not import demo balances or activate provider settlement until official provider specifications, signed-event verification, independent reconciliation, operational controls and production database procedures have been implemented and tested.
 
 ## Local verification still required
 
