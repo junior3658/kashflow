@@ -1,6 +1,6 @@
 # KASHFLOW — Development Status & Tracking Matrix
 
-**Date**: November 13, 2026  
+**Date**: November 27, 2026  
 **Platform**: KASHFLOW — AI-Powered Financial Orchestration Platform  
 **Architecture**: Modular Monolith prototype (Full-stack TypeScript / Node Express + React 19 + Tailwind CSS v4)
 
@@ -11,12 +11,12 @@
 | Module | Priority | Status | Verification Criteria |
 | :--- | :---: | :---: | :--- |
 | **Foundation & Runtime** | P0 | COMPLETED | Full-stack server with Vite middleware, Port 3000, TypeScript strict |
-| **Authentication & RBAC** | P0 | BASIC AUTH IMPLEMENTED ON FEATURE BRANCH | SQLite auth accounts, scrypt password hashes, Resend email verification, hashed HttpOnly sessions and protected API routes; financial-domain persistence, full RBAC and production hardening remain incomplete |
-| **Financial Core & Ledger** | P0 | PROTOTYPE | Double-entry validation logic exists; data is in-memory and production-grade atomic persistence is not implemented |
-| **Wallets & Balances** | P0 | DEMO DATA | Multi-currency wallet views use seeded in-memory values; external balances are not verified against live providers |
-| **Transaction State Machine** | P0 | PROTOTYPE | Transaction lifecycle and local idempotency logic exist; provider settlement and durable concurrency guarantees are incomplete |
-| **PayPal Sandbox Provider** | P0 | MOCK / INCOMPLETE | Local mock adapter; OAuth, real Sandbox Orders/Capture calls and cryptographic webhook verification are not implemented |
-| **Shwary Provider** | P1 | PARTIAL | DRC CDF collection endpoint wired to supplied sample (Sandbox default); payout and balance endpoints blocked pending official specs; callback is not yet verified |
+| **Authentication & RBAC** | P0 | IMPLEMENTED / HARDENED PROTOTYPE | SQLite auth accounts, scrypt hashes, one-time verification, hashed HttpOnly sessions and origin-guarded writes; revoked business memberships no longer block personal login or expose an active org context. Shared/distributed rate limiting and production review remain outstanding |
+| **Financial Core & Ledger** | P0 | PARTIAL SQLITE CUTOVER | Provisioned-wallet internal USD transfers persist drafts, idempotency, reservations, balanced ledger posting and projections atomically; legacy/demo paths and provider settlement remain unmigrated |
+| **Wallets & Balances** | P0 | MIXED PERSISTENT / SIMULATED | Provisioned personal/business wallets and authenticated reads use SQLite; seeded legacy wallets remain explicitly simulated. Provider balances remain unverified unless separately evidenced |
+| **Transaction State Machine** | P0 | PARTIAL PERSISTENT INTERNAL PATH | Zero-fee USD internal transfers use durable per-user idempotency, atomic PENDING reservations, PROCESSING/posting/SUCCEEDED and cancellation. Other legacy and provider lifecycles remain disabled or unmigrated |
+| **PayPal Provider** | P0 | FAIL-CLOSED / DISABLED | Order creation, capture and unimplemented webhook verification fail closed; no OAuth, live capture or settlement is enabled |
+| **Shwary Provider** | P1 | PARTIAL / NON-SETTLING | Collection adapter remains non-settling; HTTP 2xx is not confirmation. Signed callback verification, payouts, merchant balance and collected-fund reuse remain disabled pending official specifications |
 | **Provider Routing Engine** | P0 | PROTOTYPE | Local routing and fee estimates; live provider pricing and settlement are not verified |
 | **Currency Exchange Module** | P1 | PROTOTYPE | Demo/local rates and quote workflow; not a verified live FX provider |
 | **Crypto Simulation Engine** | P2 | COMPLETED | BTC, ETH, USDT simulated portfolio, buy/sell simulation, risk notice |
@@ -32,9 +32,11 @@
 
 ## 2. Invariant Checklist
 
-- [ ] **No Autonomous Financial Execution by AI**: Design intent is draft-first; verify every action path before production.
-- [ ] **Double-Entry Balance**: Ledger logic includes balance validation; verify atomic rollback and persistence under production database transactions.
-- [ ] **Idempotency Enforcement**: Local idempotency logic exists; durable concurrent request protection is not yet established.
-- [ ] **Balance Distinction**: Separate concepts exist in the prototype; provider balances are not currently verified by live APIs.
-- [ ] **Decimal Arithmetic**: Ledger uses integer minor units in core paths; audit all conversions and provider currency rules before production.
-- [ ] **Organization Boundary**: Organization concepts and demo roles exist; production authentication and tenant authorization remain required.
+- [x] **No Autonomous Financial Execution by AI**: The persistent internal transfer path is explicit and confirmation-driven; LLM output cannot post a ledger entry.
+- [x] **Double-Entry Balance (persistent internal USD path)**: SQLite validates equal debit/credit totals and commits posting, wallet projections, reservation consumption and SUCCEEDED atomically.
+- [x] **Idempotency (persistent internal USD path)**: Per-user keys are immutable and bound to a canonical request fingerprint; competing reservations are serialized by SQLite.
+- [x] **Balance Provenance**: Persistent internal ledger, simulated demo balances and provider-reported balances are surfaced separately; unverified provider values are not authoritative.
+- [x] **Exact USD API Arithmetic**: Decimal strings with at most two fractional digits are converted directly to integer cents; numeric JSON values and excess precision are rejected.
+- [x] **Organization Boundary (persistent path)**: SQL revalidates active membership, transaction permission, wallet ownership and ledger-account tenant scope.
+- [ ] **Full Financial Cutover**: Legacy Maps/demo flows, EUR/CDF transfers, fees, persistent refunds and provider settlement are not yet migrated or enabled.
+- [ ] **Production Operations**: Shared rate limiting, signed provider webhooks, independent reconciliation, backups, monitoring and recovery procedures remain required.
