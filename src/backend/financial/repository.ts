@@ -12,7 +12,7 @@ export interface PersistentInternalTransferDraftInput {
   amountMinor: number;
   currency: Currency;
   description: string;
-  idempotencyKey?: string;
+  idempotencyKey: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -442,10 +442,10 @@ export class FinancialRepository {
         input.description.length < 1 || input.description.length > 500) {
       throw new Error('A valid transaction description is required.');
     }
-    if (input.idempotencyKey !== undefined &&
-        (input.idempotencyKey.length < 1 || input.idempotencyKey.length > 128 ||
-         input.idempotencyKey.trim() !== input.idempotencyKey)) {
-      throw new Error('Idempotency key must contain 1–128 characters without surrounding whitespace.');
+    if (typeof input.idempotencyKey !== 'string' ||
+        input.idempotencyKey.length < 1 || input.idempotencyKey.length > 128 ||
+        input.idempotencyKey.trim() !== input.idempotencyKey) {
+      throw new Error('Persistent internal transfers require an idempotency key of 1–128 characters without surrounding whitespace.');
     }
 
     const metadataJson = input.metadata ? stableSerialize(input.metadata) : null;
@@ -466,7 +466,7 @@ export class FinancialRepository {
 
     this.sql.exec('BEGIN IMMEDIATE');
     try {
-      if (input.idempotencyKey) {
+      {
         const existing = this.sql.prepare(
           'SELECT t.*, k.idempotency_key, k.request_sha256 FROM idempotency_keys k JOIN transactions t ON t.id = k.transaction_id WHERE k.user_id = ? AND k.idempotency_key = ?'
         ).get(input.userId, input.idempotencyKey) as (FinancialTransactionRow & { request_sha256: string }) | undefined;
@@ -489,7 +489,7 @@ export class FinancialRepository {
         input.currency, input.description, metadataJson, now, now,
       );
 
-      if (input.idempotencyKey) {
+      {
         this.sql.prepare(
           'INSERT INTO idempotency_keys (user_id, idempotency_key, request_sha256, transaction_id, created_at) VALUES (?, ?, ?, ?, ?)'
         ).run(input.userId, input.idempotencyKey, requestHash, transactionId, now);
@@ -547,6 +547,14 @@ export class FinancialRepository {
     try {
       const row = this.readTransactionRow(transactionId);
       if (!row || row.user_id !== requesterUserId) throw new Error('Transaction not found for authenticated user.');
+      if (row.status === 'SUCCEEDED') {
+        const postedBatch = this.sql.prepare(
+          "SELECT 1 AS present FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'POSTING' AND posted_at IS NOT NULL"
+        ).get(transactionId);
+        if (!postedBatch) throw new Error('Succeeded transaction is missing its posted ledger batch.');
+        this.sql.exec('COMMIT');
+        return this.mapTransaction(row);
+      }
       if (row.status !== 'PENDING') throw new Error('Execution requires a PENDING transaction.');
       if (row.provider !== 'INTERNAL' || row.transaction_type !== 'TRANSFER' ||
           !row.destination_wallet_id || row.fee_minor !== 0) {
@@ -615,6 +623,14 @@ export class FinancialRepository {
     try {
       const row = this.readTransactionRow(transactionId);
       if (!row || row.user_id !== requesterUserId) throw new Error('Transaction not found for authenticated user.');
+      if (row.status === 'CANCELLED') {
+        const activeReservation = this.sql.prepare(
+          "SELECT 1 AS present FROM wallet_reservations WHERE transaction_id = ? AND status = 'ACTIVE'"
+        ).get(transactionId);
+        if (activeReservation) throw new Error('Cancelled transaction still has an active reservation.');
+        this.sql.exec('COMMIT');
+        return this.mapTransaction(row);
+      }
       if (row.status !== 'CREATED' && row.status !== 'PENDING') {
         throw new Error('Only CREATED or PENDING transactions can be cancelled.');
       }
