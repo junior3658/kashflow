@@ -63,6 +63,11 @@ export class TransactionEngine {
       ? financialRepository.hasWallet(params.destinationWalletId)
       : false;
     if (sourceIsPersistent || destinationIsPersistent) {
+      if (typeof params.idempotencyKey !== 'string' ||
+          params.idempotencyKey.length < 1 || params.idempotencyKey.length > 128 ||
+          params.idempotencyKey.trim() !== params.idempotencyKey) {
+        throw new Error('Persistent internal transfers require a valid idempotency key.');
+      }
       // A legacy Map key must never shadow a persistent-wallet request.
       // Reusing it across storage backends is ambiguous, so fail closed.
       if (scopedKey && db.idempotencyStore.has(scopedKey)) {
