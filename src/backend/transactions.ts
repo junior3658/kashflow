@@ -50,29 +50,6 @@ export class TransactionEngine {
       throw new Error('Idempotency key must be 1–128 characters without surrounding whitespace.');
     }
     const scopedKey = params.idempotencyKey ? `${params.userId}:${params.idempotencyKey}` : undefined;
-    if (scopedKey && db.idempotencyStore.has(scopedKey)) {
-      const existingRecord = db.idempotencyStore.get(scopedKey)!;
-      const tx = db.transactions.get(existingRecord.transactionId);
-      if (tx && tx.userId === params.userId) {
-        // An idempotency key identifies one immutable request, not merely one user.
-        // Reject accidental or malicious reuse with different financial parameters.
-        const sameRequest =
-          tx.type === params.type &&
-          tx.sourceWalletId === params.sourceWalletId &&
-          tx.destinationWalletId === params.destinationWalletId &&
-          tx.amount === params.amount &&
-          tx.currency === params.currency &&
-          tx.provider === params.provider &&
-          tx.orgId === params.orgId &&
-          tx.recipientName === params.recipientName &&
-          tx.recipientAccount === params.recipientAccount;
-        if (!sameRequest) {
-          throw new Error('Idempotency key has already been used with a different transaction payload.');
-        }
-        return tx;
-      }
-    }
-
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0) {
       throw new Error('Transaction amount must be a positive safe integer in minor currency units.');
     }
@@ -86,6 +63,11 @@ export class TransactionEngine {
       ? financialRepository.hasWallet(params.destinationWalletId)
       : false;
     if (sourceIsPersistent || destinationIsPersistent) {
+      // A legacy Map key must never shadow a persistent-wallet request.
+      // Reusing it across storage backends is ambiguous, so fail closed.
+      if (scopedKey && db.idempotencyStore.has(scopedKey)) {
+        throw new Error('Idempotency key already exists in the legacy in-memory store; use a new key for persistent settlement.');
+      }
       if (!sourceIsPersistent || !destinationIsPersistent) {
         throw new Error('Persistent and in-memory wallets cannot be mixed in one transaction.');
       }
@@ -125,6 +107,32 @@ export class TransactionEngine {
         metadata,
       });
     }
+    // Map-backed idempotency is reserved for legacy demo wallets only.
+    if (scopedKey && db.idempotencyStore.has(scopedKey)) {
+      const existingRecord = db.idempotencyStore.get(scopedKey)!;
+      const tx = db.transactions.get(existingRecord.transactionId);
+      if (tx && tx.userId === params.userId) {
+        // An idempotency key identifies one immutable request, not merely one user.
+        // Reject accidental or malicious reuse with different financial parameters.
+        const sameRequest =
+          tx.type === params.type &&
+          tx.sourceWalletId === params.sourceWalletId &&
+          tx.destinationWalletId === params.destinationWalletId &&
+          tx.amount === params.amount &&
+          tx.currency === params.currency &&
+          tx.provider === params.provider &&
+          tx.orgId === params.orgId &&
+          tx.recipientName === params.recipientName &&
+          tx.recipientAccount === params.recipientAccount &&
+          tx.description === params.description &&
+          JSON.stringify(tx.metadata ?? null) === JSON.stringify(params.metadata ?? null);
+        if (!sameRequest) {
+          throw new Error('Idempotency key has already been used with a different transaction payload.');
+        }
+        return tx;
+      }
+    }
+
     if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
       throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }

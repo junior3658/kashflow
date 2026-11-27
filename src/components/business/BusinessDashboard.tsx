@@ -34,6 +34,8 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
 }) => {
   const primaryWallet = businessWallets[0];
   const treasuryBalance = primaryWallet ? (primaryWallet.internalAccountingBalance - primaryWallet.pendingDebits) / 100 : 0;
+  const balanceIsSimulated = primaryWallet?.isSimulated === true;
+  const balanceProvenanceUnknown = primaryWallet?.isSimulated === undefined;
 
   if (!businessWallets.length) {
     return (
@@ -58,6 +60,9 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
               Tax ID: CD-LSH-2026-B-9982
             </span>
             <span className="text-xs text-neutral-500 dark:text-neutral-400">· Multi-Tenant Isolated Treasury</span>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300">
+              {balanceIsSimulated ? 'SIMULATED DEMO' : balanceProvenanceUnknown ? 'LEGACY UNVERIFIED' : 'PERSISTENT LEDGER'}
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight mt-1">
             Commercial Treasury Hub
@@ -85,6 +90,14 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {(balanceIsSimulated || balanceProvenanceUnknown) && (
+        <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
+          {balanceIsSimulated
+            ? 'SIMULATED DEMO WORKSPACE — treasury balances, activity metrics, trends and card previews are illustrative only; no real funds or provider settlements are represented.'
+            : 'LEGACY UNVERIFIED WORKSPACE — balance provenance has not been verified; do not treat displayed amounts as confirmed funds.'}
+        </div>
+      )}
 
       {/* KPI Cards Strip (Crisp White Dominant Cards with Blue Accents) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

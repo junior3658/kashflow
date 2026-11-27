@@ -112,6 +112,7 @@ export class KashflowDatabase {
       internalAccountingBalance: 1284050, // $12,840.50 (in cents)
       externalProviderBalance: 0,
       externalProviderBalanceStatus: 'NOT_SYNCED',
+      isSimulated: true,
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -128,6 +129,7 @@ export class KashflowDatabase {
       internalAccountingBalance: 420000, // €4,200.00
       externalProviderBalance: 0,
       externalProviderBalanceStatus: 'NOT_SYNCED',
+      isSimulated: true,
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -144,6 +146,7 @@ export class KashflowDatabase {
       internalAccountingBalance: 2850000000, // 28,500,000 CDF
       externalProviderBalance: 0,
       externalProviderBalanceStatus: 'NOT_SYNCED',
+      isSimulated: true,
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',
@@ -160,6 +163,7 @@ export class KashflowDatabase {
       internalAccountingBalance: 8425000, // $84,250.00
       externalProviderBalance: 0,
       externalProviderBalanceStatus: 'NOT_SYNCED',
+      isSimulated: true,
       pendingDebits: 0,
       pendingCredits: 0,
       status: 'ACTIVE',

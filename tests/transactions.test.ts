@@ -9,6 +9,13 @@ import { ShwaryAdapter } from '../src/backend/providers/shwary';
 export async function testTransactionSafety() {
   console.log('--- RUNNING TRANSACTION SAFETY TESTS ---');
   const userId = 'usr_junior_01';
+  const seededDemoWalletIds = [
+    'wlt_personal_usd', 'wlt_personal_eur', 'wlt_personal_cdf', 'wlt_business_usd',
+  ];
+  if (seededDemoWalletIds.some((id) => db.wallets.get(id)?.isSimulated !== true)) {
+    throw new Error('Every seeded demo wallet must be explicitly marked as simulated.');
+  }
+  console.log('✓ Seeded personal and business balances are explicitly marked SIMULATED.');
   const sourceWalletId = 'wlt_personal_usd';
   const seedWallet = db.wallets.get(sourceWalletId)!;
   const before = seedWallet.internalAccountingBalance;
@@ -134,6 +141,52 @@ export async function testTransactionSafety() {
   financialRepository.provisionBusinessWallet(
     membershipTestUserId, membershipTestOrgId, 'Membership authorization test', membershipTestCreatedAt,
   );
+
+  // A legacy in-memory idempotency key must not shadow a persistent-wallet transfer.
+  const legacyCollisionKey = `legacy-shadow-${randomUUID()}`;
+  const legacyShadowId = `tx_legacy_shadow_${randomUUID()}`;
+  const persistentBoundaryParams = {
+    userId: membershipTestUserId,
+    orgId: membershipTestOrgId,
+    type: 'TRANSFER' as const,
+    sourceWalletId: membershipTestPersonalWalletId,
+    destinationWalletId: membershipTestWalletId,
+    amount: 100,
+    currency: 'USD' as const,
+    provider: 'INTERNAL' as const,
+    description: 'Persistent idempotency storage boundary',
+  };
+  const legacyShadow = {
+    id: legacyShadowId,
+    idempotencyKey: legacyCollisionKey,
+    ...persistentBoundaryParams,
+    status: 'CREATED' as const,
+    fee: 0,
+    createdAt: membershipTestCreatedAt,
+    updatedAt: membershipTestCreatedAt,
+  };
+  db.transactions.set(legacyShadowId, legacyShadow);
+  db.idempotencyStore.set(`${membershipTestUserId}:${legacyCollisionKey}`, {
+    transactionId: legacyShadowId, response: legacyShadow, createdAt: Date.now(),
+  });
+  let legacyCollisionRejected = false;
+  try {
+    TransactionEngine.createDraft({ ...persistentBoundaryParams, idempotencyKey: legacyCollisionKey });
+  } catch (error) {
+    legacyCollisionRejected = error instanceof Error && error.message.includes('legacy in-memory store');
+  }
+  if (!legacyCollisionRejected) throw new Error('A legacy Map idempotency entry shadowed a persistent-wallet transfer.');
+  db.transactions.delete(legacyShadowId);
+  db.idempotencyStore.delete(`${membershipTestUserId}:${legacyCollisionKey}`);
+
+  const persistentBoundaryDraft = TransactionEngine.createDraft({
+    ...persistentBoundaryParams, idempotencyKey: `persistent-boundary-${randomUUID()}`,
+  });
+  if (!financialRepository.hasTransaction(persistentBoundaryDraft.id)) {
+    throw new Error('A transfer using persistent wallets did not create a SQLite transaction.');
+  }
+  financialRepository.cancelInternalTransaction(persistentBoundaryDraft.id, membershipTestUserId, 'Test cleanup');
+  console.log('✓ Legacy Map idempotency cannot shadow or downgrade a persistent SQLite transfer.');
   db.users.set(membershipTestUserId, {
     id: membershipTestUserId, email: `${membershipTestUserId}@example.test`,
     fullName: 'Membership Test Owner', role: 'BUSINESS_OWNER',

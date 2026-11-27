@@ -134,11 +134,20 @@ apiRouter.get('/wallets', (req: Request, res: Response) => {
     wallets = WalletService.getWalletsByOwner(ownerId, walletType);
   }
   const consolidated = WalletService.getConsolidatedNetWorthUsd(ownerId, wallets);
+  const hasSimulatedWallets = wallets.some((wallet) => wallet.isSimulated === true);
+  const hasLegacyUnverifiedWallets = wallets.some((wallet) => wallet.isSimulated === undefined);
+  const walletBalanceProvenance = hasSimulatedWallets
+    ? 'SIMULATED_DEMO'
+    : hasLegacyUnverifiedWallets ? 'LEGACY_UNVERIFIED' : 'PERSISTENT_LEDGER';
   res.json({
     wallets,
     consolidatedNetWorthUsd: consolidated.totalUsd,
-    consolidatedNetWorthBasis: 'ESTIMATED_FROM_INTERNAL_LEDGER',
+    consolidatedNetWorthBasis: hasSimulatedWallets
+      ? 'SIMULATED_DEMO_LEDGER'
+      : hasLegacyUnverifiedWallets ? 'LEGACY_UNVERIFIED_LEDGER' : 'ESTIMATED_FROM_INTERNAL_LEDGER',
+    walletBalanceProvenance,
     isConsolidatedNetWorthEstimated: true,
+    isConsolidatedNetWorthSimulated: hasSimulatedWallets,
     providerBalancesVerified: wallets.length > 0 && wallets.every((wallet) => wallet.externalProviderBalanceStatus === 'VERIFIED'),
   });
 });

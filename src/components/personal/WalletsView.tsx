@@ -57,19 +57,33 @@ export const WalletsView: React.FC<WalletsViewProps> = ({
                   </span>
                   <h3 className="text-base font-extrabold text-neutral-900 dark:text-white mt-0.5">{wallet.name}</h3>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-neutral-100 text-neutral-900 border border-neutral-300 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700">
-                  {wallet.type}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-neutral-100 text-neutral-900 border border-neutral-300 dark:bg-neutral-800 dark:text-neutral-100 dark:border-neutral-700">
+                    {wallet.type}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300">
+                    {wallet.isSimulated === true ? 'SIMULATED' : wallet.isSimulated === false ? 'PERSISTENT' : 'UNVERIFIED'}
+                  </span>
+                </div>
               </div>
 
               {/* Balance display */}
               <div className="pt-2">
-                <div className="text-xs text-neutral-500 dark:text-neutral-400">Available Internal Ledger</div>
+                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {wallet.isSimulated === true ? 'Simulated Demo Ledger' : wallet.isSimulated === false ? 'Available Internal Ledger' : 'Legacy Unverified Ledger'}
+                </div>
                 <div className="text-3xl font-black text-neutral-950 dark:text-white font-mono tabular-nums tracking-tight mt-0.5">
                   {wallet.currency === 'USD' ? '$' : wallet.currency === 'EUR' ? '€' : ''}
                   {available.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   <span className="text-xs font-sans font-normal text-neutral-500 dark:text-neutral-400 ml-1.5">{wallet.currency}</span>
                 </div>
+                {wallet.isSimulated !== false && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-2">
+                    {wallet.isSimulated === true
+                      ? 'Illustrative demo balance only — not customer funds or provider-held funds.'
+                      : 'Legacy balance provenance is unverified; do not treat it as confirmed funds.'}
+                  </p>
+                )}
               </div>
 
               {/* Balance Breakdown Matrix */}

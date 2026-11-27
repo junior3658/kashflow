@@ -107,3 +107,12 @@ This preserves the `REFUNDED` lifecycle without reopening the revoked membership
 - Cancellation is owner-scoped and uses the SQL state transition trigger to release an active reservation.
 - Transaction reads and confirmation/cancellation routes are scoped to the authenticated creator. Provider transactions remain outside this internal path; Shwary/PayPal HTTP responses do not authorize postings.
 - The initial implementation intentionally supports zero-fee internal transfers only. Provider settlement, exchange, cross-currency postings, refunds and legacy demo-balance import remain disabled or unmigrated.
+
+
+## Persistent internal transfers and balance provenance — 27 November 2026
+
+- The internal transfer lifecycle is now backed by SQLite for provisioned wallets: draft creation and per-user idempotency, PENDING reservation, PROCESSING, balanced posting, wallet/account projections, reservation consumption, SUCCEEDED and cancellation share explicit SQL transactions.
+- This path is intentionally restricted to zero-fee USD wallet-to-wallet transfers. Provider settlement, refunds, FX and demo-balance imports remain disabled or unmigrated.
+- The legacy in-memory idempotency map is never allowed to shadow a request whose wallets are persistent. If the same user/key already exists in the legacy map, the persistent request fails closed and requires a new key; the map-backed idempotency fingerprint also includes description and metadata.
+- Seeded in-memory demo wallets are explicitly marked `isSimulated = true`. Wallet APIs identify simulated demo balances separately from estimated values based on persistent internal-ledger projections. Missing provenance is surfaced as legacy/unverified rather than silently treated as persistent.
+- The personal and business wallet interfaces display SIMULATED, PERSISTENT or UNVERIFIED provenance. A simulated business workspace labels its other illustrative dashboard metrics as demo data as well.

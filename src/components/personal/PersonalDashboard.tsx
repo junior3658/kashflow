@@ -47,6 +47,8 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
   // Primary USD Wallet
   const usdWallet = wallets.find((w) => w.currency === 'USD') || wallets[0];
   const totalBalanceUsd = usdWallet ? (usdWallet.internalAccountingBalance - usdWallet.pendingDebits) / 100 : 0;
+  const balanceIsSimulated = usdWallet?.isSimulated === true;
+  const balanceProvenanceUnknown = usdWallet?.isSimulated === undefined;
 
   return (
     <div className="space-y-6 pb-12">
@@ -94,7 +96,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                   Total Available Balance
                 </span>
                 <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 dark:text-blue-300 dark:bg-blue-950/70 dark:border-blue-800 px-2 py-0.5 rounded-full">
-                  ● Internal Ledger · Prototype
+                  {balanceIsSimulated ? '● SIMULATED DEMO · INTERNAL LEDGER' : balanceProvenanceUnknown ? '● LEGACY · UNVERIFIED' : '● PERSISTENT LEDGER · ESTIMATED'}
                 </span>
               </div>
 
@@ -107,7 +109,7 @@ export const PersonalDashboard: React.FC<PersonalDashboardProps> = ({
                 <span className="text-xs sm:text-sm font-sans font-semibold text-blue-600 dark:text-blue-400 ml-2">USD</span>
               </div>
               <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                Calculated from KASHFLOW's internal prototype ledger. Provider balances are not yet synchronized or verified.
+                {balanceIsSimulated ? 'Illustrative demo balance only; it does not represent customer funds or provider-held funds.' : balanceProvenanceUnknown ? 'Legacy balance provenance is unverified. Do not treat this amount as confirmed funds.' : 'Calculated from the persistent internal ledger projection. Provider balances remain separate and unverified.'}
               </div>
             </div>
 
