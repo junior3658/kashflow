@@ -15,10 +15,74 @@ export async function testAuthVerificationConcurrency() {
   process.env.FINANCIAL_DATABASE_PATH = path.join(directory, 'financial.sqlite');
 
   try {
-    const { verifyEmail } = await import('../src/backend/auth/store');
-    const authDb = new Database(databasePath);
     const now = new Date().toISOString();
+    const revokedBusinessUserId = 'usr_auth_revoked_business_owner';
+    const revokedBusinessOrgId = `org_${revokedBusinessUserId}`;
+    const revokedBusinessEmail = 'revoked-business-owner@example.test';
+    const revokedBusinessPassword = 'Revoked-Owner-Login-Password-123!';
+    const revokedBusinessSalt = randomBytes(16).toString('hex');
 
+    const { getFinancialRepository } = await import('../src/backend/financial/repository');
+    const financialRepository = getFinancialRepository();
+    financialRepository.provisionPersonalWallets(revokedBusinessUserId, now);
+    financialRepository.provisionBusinessWallet(
+      revokedBusinessUserId, revokedBusinessOrgId, 'Revoked Business Workspace', now,
+    );
+    if (!financialRepository.revokeOrganizationMembership(revokedBusinessUserId, revokedBusinessOrgId)) {
+      throw new Error('Could not prepare a revoked business-owner membership fixture.');
+    }
+
+    // Seed a verified BUSINESS account before importing auth/store so the module's
+    // startup hydration exercises the same revoked-membership path as production.
+    const seedAuthDb = new Database(databasePath);
+    seedAuthDb.exec(`
+      CREATE TABLE auth_users(
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        full_name TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        password_salt TEXT NOT NULL,
+        verified_at TEXT,
+        created_at TEXT NOT NULL,
+        account_type TEXT NOT NULL DEFAULT 'PERSONAL',
+        business_name TEXT
+      )
+    `);
+    seedAuthDb.prepare(
+      'INSERT INTO auth_users(id,email,full_name,password_hash,password_salt,verified_at,created_at,account_type,business_name) VALUES(?,?,?,?,?,?,?,?,?)'
+    ).run(
+      revokedBusinessUserId,
+      revokedBusinessEmail,
+      'Revoked Business Owner',
+      scryptSync(revokedBusinessPassword, revokedBusinessSalt, 64).toString('hex'),
+      revokedBusinessSalt,
+      now,
+      now,
+      'BUSINESS',
+      'Revoked Business Workspace',
+    );
+    seedAuthDb.close();
+
+    const { verifyEmail, loginAccount, getSessionUserId, publicUser } = await import('../src/backend/auth/store');
+    const { db } = await import('../src/backend/db');
+    const revokedBusinessToken = await loginAccount(revokedBusinessEmail, revokedBusinessPassword);
+    if (getSessionUserId(revokedBusinessToken) !== revokedBusinessUserId) {
+      throw new Error('A revoked business workspace incorrectly prevented personal account authentication.');
+    }
+    if (db.users.get(revokedBusinessUserId)?.currentOrgId !== undefined) {
+      throw new Error('A revoked business workspace remained in the runtime authorization context.');
+    }
+    const revokedBusinessProfile = publicUser(revokedBusinessUserId);
+    if (!revokedBusinessProfile || 'organizationId' in revokedBusinessProfile ||
+        financialRepository.hasActiveMembership(revokedBusinessUserId, revokedBusinessOrgId)) {
+      throw new Error('A revoked business organization was exposed as active in the public profile.');
+    }
+    if (financialRepository.getWalletsByOwner('USER', revokedBusinessUserId, revokedBusinessUserId, 'PERSONAL').length !== 3) {
+      throw new Error('Personal wallets were not retained when business membership was revoked.');
+    }
+    console.log('✓ Revoked business membership blocks organization access without blocking personal login.');
+
+    const authDb = new Database(databasePath);
     const validUserId = 'usr_auth_concurrency_valid';
     const validEmail = 'auth-concurrency-valid@example.test';
     const validCode = '482915';
