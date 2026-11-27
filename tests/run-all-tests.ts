@@ -14,6 +14,7 @@ import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
 import { testFinancialWalletProvisioning } from './financial-wallet-provisioning.test';
 import { testFinancialPersistentTransactions } from './financial-persistent-transactions.test';
 import { testMoneyMinorUnits } from './money.test';
+import { testFinancialPersistentRestart } from './financial-restart.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -28,6 +29,7 @@ async function runAll() {
     testFinancialSqliteSchema();
     testFinancialWalletProvisioning();
     testFinancialPersistentTransactions();
+    testFinancialPersistentRestart();
     testMoneyMinorUnits();
     await testTransactionSafety();
     console.log('');
