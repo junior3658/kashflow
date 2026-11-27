@@ -112,17 +112,31 @@ function addRuntimeUser(user: AuthRuntimeUser): void {
   const financialRepository = getFinancialRepository();
   financialRepository.provisionPersonalWallets(user.id, user.created_at);
   const isBusiness = user.account_type === 'BUSINESS';
-  const orgId = isBusiness ? `org_${user.id}` : undefined;
-  if (isBusiness && orgId) {
-    const businessName = user.business_name?.trim() || `${user.full_name}'s business`;
-    financialRepository.provisionBusinessWallet(user.id, orgId, businessName, user.created_at);
+  const candidateOrgId = isBusiness ? `org_${user.id}` : undefined;
+  let activeOrgId: string | undefined;
+
+  if (isBusiness && candidateOrgId) {
+    try {
+      const businessName = user.business_name?.trim() || `${user.full_name}'s business`;
+      financialRepository.provisionBusinessWallet(user.id, candidateOrgId, businessName, user.created_at);
+      activeOrgId = candidateOrgId;
+    } catch (error) {
+      // A terminally revoked/suspended/mismatched business workspace must never
+      // be recreated during login. Keep personal authentication available while
+      // withholding the organization context and all business-wallet projections.
+      console.warn(
+        '[KASHFLOW] Business workspace unavailable; continuing without organization access.',
+        error instanceof Error ? error.message : 'Unknown provisioning error',
+      );
+    }
   }
+
   db.users.set(user.id, {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
     role: isBusiness ? 'BUSINESS_OWNER' : 'PERSONAL_USER',
-    ...(orgId ? { currentOrgId: orgId } : {}),
+    ...(activeOrgId ? { currentOrgId: activeOrgId } : {}),
     createdAt: user.created_at,
   });
 
@@ -140,10 +154,10 @@ function addRuntimeUser(user: AuthRuntimeUser): void {
     }
   }
 
-  if (isBusiness && orgId) {
-    if (!db.organizations.has(orgId)) {
-      db.organizations.set(orgId, {
-        id: orgId,
+  if (activeOrgId) {
+    if (!db.organizations.has(activeOrgId)) {
+      db.organizations.set(activeOrgId, {
+        id: activeOrgId,
         name: user.business_name || `${user.full_name}'s business`,
         ownerUserId: user.id,
         currency: 'USD',
@@ -153,12 +167,12 @@ function addRuntimeUser(user: AuthRuntimeUser): void {
     }
     const membershipId = `mem_${user.id}`;
     if (!db.memberships.has(membershipId)) {
-      db.memberships.set(membershipId, { id: membershipId, orgId, userId: user.id, role: 'OWNER', permissions: ['ALL'] });
+      db.memberships.set(membershipId, { id: membershipId, orgId: activeOrgId, userId: user.id, role: 'OWNER', permissions: ['ALL'] });
     }
-    const businessWalletId = `wlt_${orgId}_usd`;
+    const businessWalletId = `wlt_${activeOrgId}_usd`;
     if (!db.wallets.has(businessWalletId)) {
       db.wallets.set(businessWalletId, {
-        id: businessWalletId, ownerId: orgId, type: 'BUSINESS', currency: 'USD',
+        id: businessWalletId, ownerId: activeOrgId, type: 'BUSINESS', currency: 'USD',
         name: `${user.business_name || 'Business'} Treasury`,
         internalAccountingBalance: 0, externalProviderBalance: 0,
         externalProviderBalanceStatus: 'NOT_SYNCED', pendingDebits: 0,
@@ -379,16 +393,23 @@ export function publicUser(id: string) {
   const user = sql.prepare(
     'SELECT id, email, full_name, created_at, account_type, business_name FROM auth_users WHERE id = ? AND verified_at IS NOT NULL'
   ).get(id) as any;
+  if (!user) return null;
 
-  return user ? {
+  const organizationId = user.account_type === 'BUSINESS' ? `org_${user.id}` : undefined;
+  const hasActiveOrganization = organizationId
+    ? getFinancialRepository().hasActiveMembership(user.id, organizationId)
+    : false;
+
+  return {
     id: user.id,
     email: user.email,
     fullName: user.full_name,
     role: user.account_type === 'BUSINESS' ? 'BUSINESS_OWNER' : 'PERSONAL_USER',
     accountType: user.account_type || 'PERSONAL',
-    ...(user.account_type === 'BUSINESS' ? { businessName: user.business_name, organizationId: `org_${user.id}` } : {}),
+    ...(user.account_type === 'BUSINESS' ? { businessName: user.business_name } : {}),
+    ...(hasActiveOrganization && organizationId ? { organizationId } : {}),
     createdAt: user.created_at,
-  } : null;
+  };
 }
 
 export const SESSION_COOKIE_NAME = COOKIE;
