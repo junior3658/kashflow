@@ -15,6 +15,7 @@ import { AIOrchestrator } from './ai/orchestrator';
 import { SecurityAuditSuite } from './security/audit-scenarios';
 import { LedgerEngine } from './ledger';
 import { getFinancialRepository } from './financial/repository';
+import { parseUsdMinorUnits } from './money';
 import { LLMProvider } from './ai/llm-provider';
 import { registerAccount, verifyEmail, loginAccount, resendVerification, setSessionCookie, clearSessionCookie, revokeSession, publicUser, SESSION_COOKIE_NAME } from './auth/store';
 import { enforceSameOriginWrites, requireAuth, readCookie } from './auth/middleware';
@@ -182,10 +183,13 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
     if (currency && currency !== 'USD') {
       return res.status(409).json({ error: 'Internal transfers are temporarily limited to USD while currency-specific ledger accounts are completed.' });
     }
-    const numericAmount = Number(amount);
-    const amountCents = Math.round(numericAmount * 100);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isSafeInteger(amountCents)) {
-      return res.status(400).json({ error: 'Amount must be a positive valid USD amount.' });
+    const amountCents = parseUsdMinorUnits(amount);
+    if (amountCents === null) {
+      return res.status(400).json({ error: 'Amount must be a positive decimal string with at most two fractional digits.' });
+    }
+    if (typeof idempotencyKey !== 'string' || idempotencyKey.length < 1 ||
+        idempotencyKey.length > 128 || idempotencyKey.trim() !== idempotencyKey) {
+      return res.status(400).json({ error: 'A valid Idempotency-Key is required for internal transfers.' });
     }
     const currentOrgId = db.users.get(userId)?.currentOrgId;
     const ownedWallet = (() => {
@@ -199,7 +203,7 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Source wallet is not available to this account.' });
     }
     const draft = TransactionEngine.createDraft({
-      idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined,
+      idempotencyKey,
       userId,
       orgId: ownedWallet.type === 'BUSINESS' ? currentOrgId : undefined,
       type: 'TRANSFER',
