@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X, Send, ShieldCheck, ArrowRight, UserCheck, Smartphone, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Currency, Wallet } from '../../backend/types';
 
@@ -25,6 +25,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
   const [step, setStep] = useState<'input' | 'preview' | 'success'>('input');
   const [draftTx, setDraftTx] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -33,6 +34,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
   const numAmount = parseFloat(amountStr) || 0;
 
   const handleNumpadKey = (key: string) => {
+    idempotencyKeyRef.current = null;
     if (key === 'BACK') {
       setAmountStr((prev) => (prev.length > 1 ? prev.slice(0, -1) : '0'));
     } else if (key === '.') {
@@ -54,19 +56,21 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
 
     setErrorMsg(null);
     setIsSubmitting(true);
+    const idempotencyKey = idempotencyKeyRef.current ?? `transfer_${crypto.randomUUID()}`;
+    idempotencyKeyRef.current = idempotencyKey;
 
     try {
       const res = await fetch('/api/v1/transfers/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: numAmount,
+          amount: amountStr,
           currency,
           recipientName: recipient,
           recipientAccount: recipientPhone,
           sourceWalletId: currentWallet.id,
           provider: selectedProvider,
-          idempotencyKey: `client_req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          idempotencyKey,
         }),
       });
 
@@ -164,7 +168,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
               {(['USD', 'EUR', 'CDF'] as Currency[]).map((cur) => (
                 <button
                   key={cur}
-                  onClick={() => setCurrency(cur)}
+                  onClick={() => { idempotencyKeyRef.current = null; setCurrency(cur); }}
                   className={`py-1.5 rounded-lg border font-mono font-bold transition-colors cursor-pointer ${
                     currency === cur
                       ? 'bg-neutral-900 text-white border-neutral-900 dark:bg-white dark:text-neutral-950 dark:border-white'
@@ -208,7 +212,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
                   <input
                     type="text"
                     value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
+                    onChange={(e) => { idempotencyKeyRef.current = null; setRecipient(e.target.value); }}
                     className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white"
                   />
                 </div>
@@ -217,7 +221,7 @@ export const SendMoneyModal: React.FC<SendMoneyModalProps> = ({
                   <input
                     type="text"
                     value={recipientPhone}
-                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    onChange={(e) => { idempotencyKeyRef.current = null; setRecipientPhone(e.target.value); }}
                     className="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white font-mono"
                   />
                 </div>
