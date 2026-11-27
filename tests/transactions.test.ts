@@ -220,6 +220,7 @@ export async function testTransactionSafety() {
     sourceWalletId: membershipTestWalletId, destinationWalletId: membershipTestPersonalWalletId,
     amount: 100, currency: 'USD', provider: 'INTERNAL',
     description: 'Authorized persistent organization member access',
+    idempotencyKey: `authorized-membership-${randomUUID()}`,
   });
   TransactionEngine.cancelTransaction(authorizedBusinessDraft.id, 'Test cleanup', membershipTestUserId);
 
@@ -233,8 +234,12 @@ export async function testTransactionSafety() {
       sourceWalletId: membershipTestWalletId, destinationWalletId: membershipTestPersonalWalletId,
       amount: 100, currency: 'USD', provider: 'INTERNAL',
       description: 'Revoked membership must not authorize a new draft',
+      idempotencyKey: `revoked-membership-${randomUUID()}`,
     });
-  } catch { revokedMembershipAccessRejected = true; }
+  } catch (error) {
+    revokedMembershipAccessRejected = error instanceof Error &&
+      error.message.includes('persistent organization transaction membership');
+  }
   if (!revokedMembershipAccessRejected) {
     throw new Error('A revoked persistent organization membership still authorized a wallet draft.');
   }
