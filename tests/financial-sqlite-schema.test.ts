@@ -18,17 +18,19 @@ export function testFinancialSqliteSchema() {
   const addTransaction = (input: {
     id: string;
     userId?: string;
-    provider?: 'INTERNAL' | 'PAYPAL' | 'SHWARY';
+    provider?: 'INTERNAL' | 'PAYPAL' | 'SHWARY;
     orgId?: string;
+    status?: 'CREATED' | 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
     sourceWalletId?: string;
     destinationWalletId?: string | null;
     amount?: number;
     fee?: number;
-  }) => sql.prepare("INSERT INTO transactions (id, user_id, org_id, transaction_type, status, source_wallet_id, destination_wallet_id, amount_minor, fee_minor, currency, provider, description, created_at, updated_at) VALUES (?, ?, ?, 'TRANSFER', 'CREATED', ?, ?, ?, ?, 'USD', ?, ?, ?, ?)")
+  }) => sql.prepare("INSERT INTO transactions (id, user_id, org_id, transaction_type, status, source_wallet_id, destination_wallet_id, amount_minor, fee_minor, currency, provider, description, created_at, updated_at) VALUES (?, ?, ?, 'TRANSFER', ?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?)")
     .run(
       input.id,
       input.userId || 'user-a',
       input.orgId || null,
+      input.status ?? 'CREATED',
       input.sourceWalletId || 'wallet-a',
       input.destinationWalletId === undefined ? 'wallet-b' : input.destinationWalletId,
       input.amount ?? 500,
@@ -55,6 +57,12 @@ export function testFinancialSqliteSchema() {
     addAccount('account-wallet-b', '2010-B', 'LIABILITY', 'wallet-b', 0);
     addAccount('account-wallet-other', '2010-C', 'LIABILITY', 'wallet-other', 10000);
     addAccount('account-cash', '1010', 'ASSET', null, 100000);
+
+    assert.throws(
+      () => addTransaction({ id: 'tx-invalid-initial-state', status: 'PENDING' }),
+      /new transactions must start in CREATED state/,
+    );
+    console.log('✓ SQL prevents transactions from bypassing the CREATED initial state.');
 
     sql.prepare('INSERT INTO financial_organizations(id, status, created_at) VALUES(?, ?, ?)').run('org-a', 'ACTIVE', now);
     sql.prepare('INSERT INTO organization_memberships(organization_id, user_id, role, status, can_transact, created_at) VALUES(?, ?, ?, ?, ?, ?)')
@@ -249,6 +257,27 @@ export function testFinancialSqliteSchema() {
       /ledger credit total does not match entries/,
     );
     console.log('✓ SQLite refuses to post unbalanced entry totals.');
+
+    addTransaction({ id: 'tx-posting-amount-mismatch', destinationWalletId: null, amount: 100, fee: 5 });
+    sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-posting-amount-mismatch'").run();
+    sql.prepare("INSERT INTO wallet_reservations (transaction_id, wallet_id, currency, amount_minor, status, created_at, updated_at) VALUES ('tx-posting-amount-mismatch', 'wallet-a', 'USD', 105, 'ACTIVE', ?, ?)").run(now, now);
+    sql.prepare("UPDATE transactions SET status = 'PROCESSING' WHERE id = 'tx-posting-amount-mismatch'").run();
+    addBatch('batch-posting-amount-mismatch', 'tx-posting-amount-mismatch', 'POSTING', 100);
+    addEntry('entry-posting-amount-mismatch-debit', 'batch-posting-amount-mismatch', 'account-wallet-a', 'DEBIT', 100);
+    addEntry('entry-posting-amount-mismatch-credit', 'batch-posting-amount-mismatch', 'account-cash', 'CREDIT', 100);
+    const walletBeforeMismatchedPosting = sql.prepare(
+      "SELECT internal_balance_minor, pending_debits_minor FROM wallets WHERE id = 'wallet-a'"
+    ).get();
+    assert.throws(
+      () => sql.prepare("UPDATE ledger_batches SET posted_at = ? WHERE id = 'batch-posting-amount-mismatch'").run(now),
+      /posting batch totals must equal transaction amount plus fee/,
+    );
+    assert.deepEqual(
+      sql.prepare("SELECT internal_balance_minor, pending_debits_minor FROM wallets WHERE id = 'wallet-a'").get(),
+      walletBeforeMismatchedPosting,
+    );
+    sql.prepare("UPDATE transactions SET status = 'FAILED' WHERE id = 'tx-posting-amount-mismatch'").run();
+    console.log('✓ SQLite rejects balanced postings whose amount does not match the transaction intent and fee.');
 
     addTransaction({ id: 'tx-shwary', provider: 'SHWARY', destinationWalletId: null, amount: 250 });
     sql.prepare("UPDATE transactions SET status = 'PENDING' WHERE id = 'tx-shwary'").run();
