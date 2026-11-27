@@ -82,10 +82,28 @@ export class SecurityAuditSuite {
       amount: 5000,
       currency: 'USD',
       provider: 'INTERNAL',
-      description: 'Idempotency test payload 2 (duplicate)',
+      description: 'Idempotency test payload 1',
     });
 
-    const isIdentical = draft1.id === draft2.id;
+    let changedPayloadRejected = false;
+    try {
+      TransactionEngine.createDraft({
+        idempotencyKey: key,
+        userId: 'usr_junior_01',
+        type: 'TRANSFER',
+        sourceWalletId: 'wlt_personal_usd',
+        destinationWalletId,
+        amount: 5000,
+        currency: 'USD',
+        provider: 'INTERNAL',
+        description: 'Idempotency test payload with changed description',
+      });
+    } catch (error) {
+      changedPayloadRejected = error instanceof Error &&
+        error.message.includes('different transaction payload');
+    }
+
+    const isIdentical = draft1.id === draft2.id && changedPayloadRejected;
     db.wallets.delete(destinationWalletId);
     return {
       id: 1,
@@ -94,9 +112,9 @@ export class SecurityAuditSuite {
       status: isIdentical ? 'PASSED' : 'FAILED',
       durationMs: Date.now() - start,
       details: isIdentical
-        ? `Reused existing transaction '${draft1.id}'. Prevented double-debit.`
-        : 'Failed: Duplicate transaction was created for identical key.',
-      invariantChecked: 'A repeated idempotency key must never create duplicate financial records.',
+        ? `Replayed '${draft1.id}' for the same payload and rejected changed payload reuse.`
+        : 'Failed: idempotency replay or payload-conflict protection did not hold.',
+      invariantChecked: 'A repeated key must replay only an identical immutable request and reject changed payloads.',
     };
   }
 
