@@ -1,4 +1,4 @@
-# SQLite financial schema and partial persistent transfer engine (version 6)
+# SQLite financial schema and partial persistent transfer engine (version 7)
 
 ## Current implementation status — 27 November 2026
 
@@ -116,6 +116,12 @@ This preserves the `REFUNDED` lifecycle without reopening the revoked membership
 - Transaction reads and confirmation/cancellation routes are scoped to the authenticated creator. Provider transactions remain outside this internal path; Shwary/PayPal HTTP responses do not authorize postings.
 - The initial implementation intentionally supports zero-fee internal transfers only. Provider settlement, exchange, cross-currency postings, refunds and legacy demo-balance import remain disabled or unmigrated.
 
+
+## Version 7 — transaction initial-state and posting-amount guards
+
+New transaction rows must begin in `CREATED`; direct SQL inserts cannot skip the draft state by creating a `PENDING`, `PROCESSING` or terminal transaction. Before a `POSTING` batch is marked posted, its debit total must equal the immutable transaction amount plus fee. The existing batch balance check then requires credits to equal the same total. A balanced batch with the wrong financial amount therefore cannot update ledger or wallet projections.
+
+The guards are additive and apply to newly inserted transactions and newly posted batches. They do not rewrite existing rows or import historical/demo balances.
 
 ## Persistent internal transfers and balance provenance — 27 November 2026
 
