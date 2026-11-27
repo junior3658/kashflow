@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export type FinancialDatabase = InstanceType<typeof Database>;
 
-export const FINANCIAL_SCHEMA_VERSION = 6;
+export const FINANCIAL_SCHEMA_VERSION = 7;
 
 const schema = String.raw`
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -337,6 +337,13 @@ BEGIN
   SELECT RAISE(ABORT, 'wallet reservation identity is immutable');
 END;
 
+CREATE TRIGGER IF NOT EXISTS trg_transactions_initial_state
+BEFORE INSERT ON transactions
+WHEN NEW.status <> 'CREATED'
+BEGIN
+  SELECT RAISE(ABORT, 'new transactions must start in CREATED state');
+END;
+
 DROP TRIGGER IF EXISTS trg_transactions_validate_tenant_insert;
 
 CREATE TRIGGER IF NOT EXISTS trg_transactions_validate_tenant_insert
@@ -640,6 +647,16 @@ CREATE TRIGGER IF NOT EXISTS trg_ledger_entries_no_delete
 BEFORE DELETE ON ledger_entries
 BEGIN
   SELECT RAISE(ABORT, 'ledger entries are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ledger_batch_amount_matches_transaction
+BEFORE UPDATE OF posted_at ON ledger_batches
+WHEN OLD.posted_at IS NULL AND NEW.posted_at IS NOT NULL AND NEW.batch_type = 'POSTING'
+  AND NEW.total_debits_minor <> (
+    SELECT amount_minor + fee_minor FROM transactions WHERE id = NEW.transaction_id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'posting batch totals must equal transaction amount plus fee');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_ledger_batch_validate_post
