@@ -12,6 +12,7 @@ import { testAuthRateLimiter } from './auth-rate-limit.test';
 import { testAuthOriginGuard } from './auth-origin.test';
 import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
 import { testFinancialWalletProvisioning } from './financial-wallet-provisioning.test';
+import { testFinancialPersistentTransactions } from './financial-persistent-transactions';
 
 async function runAll() {
   console.log('====================================================');

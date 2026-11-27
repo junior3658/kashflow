@@ -77,6 +77,9 @@ export class TransactionEngine {
       throw new Error('Transaction amount must be a positive safe integer in minor currency units.');
     }
 
+    if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
+      throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
+    }
     const financialRepository = getFinancialRepository();
     const sourceIsPersistent = financialRepository.hasWallet(params.sourceWalletId);
     const destinationIsPersistent = params.destinationWalletId
