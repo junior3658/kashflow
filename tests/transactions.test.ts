@@ -168,7 +168,7 @@ export async function testTransactionSafety() {
     amount: 100, currency: 'USD', provider: 'INTERNAL',
     description: 'Authorized persistent organization member access',
   });
-  TransactionEngine.cancelTransaction(authorizedBusinessDraft.id, 'Test cleanup');
+  TransactionEngine.cancelTransaction(authorizedBusinessDraft.id, 'Test cleanup', membershipTestUserId);
 
   if (!financialRepository.revokeOrganizationMembership(membershipTestUserId, membershipTestOrgId)) {
     throw new Error('Persistent membership revocation failed.');
