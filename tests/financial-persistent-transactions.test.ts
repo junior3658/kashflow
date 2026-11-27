@@ -39,6 +39,10 @@ export function testFinancialPersistentTransactions() {
       description: 'Persistent internal transfer',
       idempotencyKey: 'persistent-transfer-001',
     };
+    assert.throws(
+      () => repository.createInternalTransferDraft({ ...input, idempotencyKey: '' }),
+      /idempotency key/,
+    );
     const draft = repository.createInternalTransferDraft(input);
     assert.equal(draft.status, 'CREATED');
     const duplicate = repository.createInternalTransferDraft(input);
@@ -54,6 +58,8 @@ export function testFinancialPersistentTransactions() {
 
     const settled = repository.executeInternalTransfer(draft.id, 'user-a');
     assert.equal(settled.status, 'SUCCEEDED');
+    const settledRetry = repository.executeInternalTransfer(draft.id, 'user-a');
+    assert.equal(settledRetry.status, 'SUCCEEDED');
     const balances = sql.prepare(
       "SELECT id, internal_balance_minor, pending_debits_minor FROM wallets WHERE id IN ('wallet-a', 'wallet-b') ORDER BY id"
     ).all() as Array<{id:string;internal_balance_minor:number;pending_debits_minor:number}>;
@@ -67,7 +73,10 @@ export function testFinancialPersistentTransactions() {
     assert.equal(posting.count, 2);
     assert.equal(posting.debits, 1000);
     assert.equal(posting.credits, 1000);
-    assert.throws(() => repository.executeInternalTransfer(draft.id, 'user-a'), /PENDING/);
+    assert.equal(
+      (sql.prepare("SELECT COUNT(*) AS count FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'POSTING' AND posted_at IS NOT NULL").get(draft.id) as {count:number}).count,
+      1,
+    );
     assert.equal(repository.getTransactionForUser(draft.id, 'user-b'), null);
     assert.equal(repository.getTransactionsByUser('user-a').some((tx) => tx.id === draft.id), true);
 
@@ -77,6 +86,8 @@ export function testFinancialPersistentTransactions() {
     repository.markInternalTransactionPending(cancelDraft.id, 'user-a');
     const cancelled = repository.cancelInternalTransaction(cancelDraft.id, 'user-a', 'Test cancellation');
     assert.equal(cancelled.status, 'CANCELLED');
+    const cancelledRetry = repository.cancelInternalTransaction(cancelDraft.id, 'user-a', 'Test cancellation retry');
+    assert.equal(cancelledRetry.status, 'CANCELLED');
     assert.equal((sql.prepare("SELECT pending_debits_minor FROM wallets WHERE id = 'wallet-a'").get() as {pending_debits_minor:number}).pending_debits_minor, 0);
 
     const insufficient = repository.createInternalTransferDraft({
