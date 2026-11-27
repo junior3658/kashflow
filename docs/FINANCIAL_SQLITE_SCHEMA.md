@@ -1,8 +1,16 @@
-# SQLite financial schema foundation (version 6)
+# SQLite financial schema and partial persistent transfer engine (version 6)
 
-## Scope of this change
+## Current implementation status — 27 November 2026
 
-This change introduces version 2 of the financial SQLite schema and automated database-invariant tests. It is a **foundation only**: the existing WalletService, LedgerEngine, TransactionEngine and API routes still use the in-memory KashflowDatabase maps. No production data has been moved and no financial service has switched to this database yet.
+The financial SQLite repository is now used for provisioned-wallet reads and for **zero-fee USD internal wallet-to-wallet transfers**. The persistent path atomically stores draft intent and per-user idempotency, reserves funds on PENDING, posts balanced debit/credit ledger entries, updates wallet and liability-account projections, consumes the reservation and marks SUCCEEDED. Owner-scoped cancellation releases an active reservation. Amounts enter the API as exact decimal strings and are stored as integer minor units.
+
+Authentication still uses a separate SQLite database. Verified users receive zero-balance personal wallets; eligible BUSINESS accounts receive a zero-balance organization wallet and OWNER membership. A revoked or unavailable business workspace is not reactivated during login and does not prevent personal authentication.
+
+This is a **partial cutover, not a production financial system**. Legacy demo wallets and some map-backed paths remain for compatibility. The persistent transfer path currently supports USD only and zero fees. Provider settlement, FX, EUR/CDF transfers, application-level persistent refunds, legacy demo-balance import and production operations remain disabled or incomplete. Shwary and PayPal cannot settle funds.
+
+## Original schema foundation scope (November 2026)
+
+This section records the original version 2 schema foundation and its initial database-invariant tests. At that stage, the existing WalletService, LedgerEngine, TransactionEngine and API routes still used the in-memory KashflowDatabase maps. Subsequent implementation milestones are recorded below.
 
 Set FINANCIAL_DATABASE_PATH to select the local database file. The default is data/kashflow-financial.sqlite; database files are ignored by Git.
 
@@ -34,46 +42,46 @@ Version 3 adds normalized amount, currency and status evidence to provider event
 
 ## Migration boundary and demo data
 
-The additive version 2 migration backfills organization identities from existing organization-owned wallets, but intentionally does **not** invent user memberships. Existing organizations must have their legitimate memberships provisioned from the authoritative organization/authentication workflow before organization transactions can be created. The authentication database and financial database are still separate; that provisioning bridge is not yet integrated into the application.
+The additive version 2 migration backfills organization identities from existing organization-owned wallets, but intentionally does **not** invent user memberships. Existing organizations must have their legitimate memberships provisioned from the authoritative organization/authentication workflow before organization transactions can be created. Authentication and financial databases remain separate; the verified-user provisioning bridge is now integrated in the auth runtime for zero-balance personal and self-registered business workspaces.
 
 The current db.ts seeds illustrative balances and historical transactions, including provider-labelled records that have no verifiable provider-event evidence. **Those seed records must not be copied into the persistent financial database as real settled funds.** The eventual cutover should start with a clean financial database or explicitly tag imported fixtures as simulated, after a deliberate migration decision. No automatic import is performed by this schema initializer.
 
-## Next implementation steps
+## Remaining implementation steps
 
-1. Add a typed financial repository over this schema.
-2. Move wallet creation and reads to SQLite, including durable personal/business wallet provisioning.
-3. Move draft creation, idempotency, reservation and state transitions into SQL transactions.
-4. Move ledger posting and reversal into the same SQL transaction as wallet and transaction updates.
-5. Replace map-backed API reads and remove financial demo fixtures from production mode.
-6. Add restart, concurrent-spend, rollback, tenant-isolation and provider-event replay tests before enabling any settlement path.
+1. Complete the application-level persistent refund/reversal operation with exact inverse entries and an atomic REFUNDED transition; keep it disabled until its tests cover authorization revocation and replay.
+2. Extend persistent internal transfers beyond zero-fee USD only after currency-specific account provisioning, fee accounting and exact amount parsing are defined.
+3. Migrate remaining map-backed wallet, transaction, ledger and idempotency paths; explicitly decide how demo balances are retired or imported as simulated fixtures.
+4. Implement provider-event ingestion with official Shwary/PayPal specifications, cryptographic signature verification, immutable evidence, replay protection and independent reconciliation before any external posting.
+5. Add operational backup/restore, busy-timeout and recovery policy, monitoring, shared rate limiting and production deployment controls.
+6. Keep restart, competing-connection, rollback, tenant-isolation and provider-event replay tests in CI.
 
-Until those steps are complete, the financial domain remains a prototype and must not process real funds.
+No real-money processing is authorized by this partial migration.
 
 
 ## Incremental personal-wallet provisioning (November 2026)
 
 The new `FinancialRepository.provisionPersonalWallets` step provisions three zero-balance personal wallet rows (USD/EUR/CDF) and their linked liability accounts for verified auth users. It uses an explicit `BEGIN IMMEDIATE` transaction and is idempotent. The runtime auth bootstrap invokes this provisioning when it loads a verified user.
 
-This is **not yet a financial-service cutover**: map-backed wallet reads, reservations, transaction state and ledger posting remain in the application. Business-wallet provisioning, authoritative persistent membership reads, ledger operations and transaction persistence remain future steps. No seeded/demo balances are imported. If a wallet projection is non-zero but its linked ledger account is missing, provisioning fails rather than fabricating an opening entry.
+At this milestone, the repository only provisioned identity and zero-balance wallet/account rows; the later persistent read and internal-transfer milestones below added the operational cutover for provisioned USD wallets. No seeded/demo balances are imported. If a wallet projection is non-zero but its linked ledger account is missing, provisioning fails rather than fabricating an opening entry.
 
 ## Incremental business-wallet provisioning (November 2026)
 
 Verified self-registered BUSINESS accounts now provision their organization identity, an ACTIVE OWNER membership with explicit `can_transact = 1`, a zero-balance USD business wallet and its linked LIABILITY ledger account in one `BEGIN IMMEDIATE` transaction. The organization ID is deterministic (`org_<userId>`), and existing suspended organizations, revoked memberships, mismatched wallet identities or non-zero projections without a matching ledger account fail closed. Repeated provisioning is idempotent.
 
-This records the account owner's self-declared business workspace; it is not legal-entity verification, KYC or authorization for provider payouts. The runtime still keeps map-backed business objects for compatibility. Financial reads, reservations, transaction state and ledger posting have not yet been cut over to SQLite.
+This records the account owner's self-declared business workspace; it is not legal-entity verification, KYC or authorization for provider payouts. Runtime business objects remain for compatibility, while provisioned-wallet reads and the restricted USD internal-transfer path now use SQLite as described below.
 
 Authentication now retries the idempotent runtime/financial provisioning when a verified user signs in. A malformed stored verification-code hash is treated as an invalid code rather than allowing `timingSafeEqual` to throw on unequal buffer lengths.
 
 ## Version 4 — persistent organization-membership authorization
 
-Runtime business-wallet reads and internal-transfer authorization now consult the persistent organization membership table in addition to the existing runtime checks. Read access requires an active organization and active membership; transaction access also requires the explicit `can_transact` permission. Revocation is performed through a repository transaction and is terminal: revoked rows cannot be reactivated or deleted/reinserted to restore access. This is an authorization bridge only; financial balances, reservations, transaction state and posting remain map-backed until the repository cutover.
+Runtime business-wallet reads and internal-transfer authorization now consult the persistent organization membership table in addition to the existing runtime checks. Read access requires an active organization and active membership; transaction access also requires the explicit `can_transact` permission. Revocation is performed through a repository transaction and is terminal: revoked rows cannot be reactivated or deleted/reinserted to restore access. This was initially an authorization bridge. Subsequent milestones moved provisioned-wallet reads and the restricted USD internal-transfer lifecycle into SQLite; legacy demo flows remain map-backed.
 
 
 ## Incremental persistent wallet reads (November 2026)
 
 The authenticated wallet-read API now uses SQLite wallet projections for provisioned personal and business accounts. Repository reads require the authenticated owner for personal wallets and an active persistent membership for organization wallets. Business reads do not fall back to map-backed balances. Personal legacy/demo reads may fall back only when no persistent personal wallet rows are present. Consolidated net worth remains an estimate based solely on the internal wallet projection and fixed illustrative conversion rates; provider balances are never included and are displayed as authoritative only when their status is VERIFIED.
 
-This is a read cutover only. Reservation, debit/credit mutation, transaction state and ledger posting remain map-backed. A zero provider-balance value in the legacy Wallet interface is a display sentinel when provider balance is NULL; the provider status remains NOT_SYNCED and must not be interpreted as a verified provider balance.
+At this milestone the change was read-only; the later persistent internal-transaction milestone below moved the supported USD transfer mutations and ledger posting into SQLite. A zero provider-balance value in the legacy Wallet interface is a display sentinel when provider balance is NULL; the provider status remains NOT_SYNCED and must not be interpreted as a verified provider balance.
 
 
 ## Version 5 — transaction-time tenant and ledger-account guards
@@ -85,7 +93,7 @@ Version 5 closes four database-level gaps discovered during the persistent-ledge
 - A ledger batch currency must equal the immutable transaction currency.
 - A ledger entry linked to a wallet may reference only a wallet owned by the transaction user or by the transaction organization with a currently active `can_transact` membership. Shared system accounts with no wallet link remain available for clearing and platform accounting.
 
-These are SQLite guardrails, not a completed financial-service migration. The existing transaction engine, reservation lifecycle and ledger posting are still map-backed; the repository has not yet made SQLite the sole operational source of truth. The next phase must move draft creation, idempotency, reservation and state transitions into repository transactions, then post ledger entries and wallet projections atomically.
+These are SQLite guardrails, not by themselves a completed financial-service migration. The persistent internal USD transfer path is now implemented in the repository and uses these guards; legacy map-backed demo flows remain, so SQLite is not yet the sole operational source of truth.
 
 No provider settlement is enabled by this schema change. Cryptographic webhook verification and independent provider reconciliation remain application-level prerequisites; Shwary and PayPal endpoints and capabilities must not be inferred.
 
