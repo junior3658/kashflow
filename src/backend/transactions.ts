@@ -76,6 +76,52 @@ export class TransactionEngine {
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0) {
       throw new Error('Transaction amount must be a positive safe integer in minor currency units.');
     }
+
+    const financialRepository = getFinancialRepository();
+    const sourceIsPersistent = financialRepository.hasWallet(params.sourceWalletId);
+    const destinationIsPersistent = params.destinationWalletId
+      ? financialRepository.hasWallet(params.destinationWalletId)
+      : false;
+    if (sourceIsPersistent || destinationIsPersistent) {
+      if (!sourceIsPersistent || !destinationIsPersistent) {
+        throw new Error('Persistent and in-memory wallets cannot be mixed in one transaction.');
+      }
+      if (params.provider !== 'INTERNAL' || params.type !== 'TRANSFER') {
+        throw new Error('Persistent wallet settlement is currently limited to internal transfers.');
+      }
+      if (!params.destinationWalletId) throw new Error('A persistent destination wallet is required.');
+      if (params.recipientAccount?.trim()) {
+        throw new Error('External beneficiary accounts cannot use the internal wallet-transfer path.');
+      }
+      const source = financialRepository.getWalletForTransaction(
+        params.sourceWalletId, params.userId, params.orgId,
+      );
+      const destination = financialRepository.getWalletForTransaction(
+        params.destinationWalletId, params.userId, params.orgId,
+      );
+      if (!source || !destination) throw new Error('Both transaction wallets must exist in persistent storage.');
+      if (source.currency !== params.currency || destination.currency !== params.currency) {
+        throw new Error('Transaction currency must match both persistent wallet currencies.');
+      }
+      if (source.id === destination.id || source.status !== 'ACTIVE' || destination.status !== 'ACTIVE') {
+        throw new Error('Persistent source and destination wallets must be distinct and active.');
+      }
+      const metadata = {
+        ...(params.metadata ?? {}),
+        ...(params.recipientName ? { recipientName: params.recipientName } : {}),
+      };
+      return financialRepository.createInternalTransferDraft({
+        userId: params.userId,
+        orgId: params.orgId,
+        sourceWalletId: source.id,
+        destinationWalletId: destination.id,
+        amountMinor: params.amount,
+        currency: params.currency,
+        description: params.description,
+        idempotencyKey: params.idempotencyKey,
+        metadata,
+      });
+    }
     if (params.provider === 'INTERNAL' && params.currency !== 'USD') {
       throw new Error('Internal settlement is temporarily limited to USD until currency-specific ledger accounts are configured.');
     }
@@ -157,7 +203,12 @@ export class TransactionEngine {
   /**
    * Transition transaction to PENDING (user is presented preview, funds reserved)
    */
-  static markPending(transactionId: string): Transaction {
+  static markPending(transactionId: string, requesterUserId?: string): Transaction {
+    const financialRepository = getFinancialRepository();
+    if (financialRepository.hasTransaction(transactionId)) {
+      if (!requesterUserId) throw new Error('Authenticated transaction owner is required.');
+      return financialRepository.markInternalTransactionPending(transactionId, requesterUserId);
+    }
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
@@ -195,7 +246,13 @@ export class TransactionEngine {
    * State machine: PENDING -> PROCESSING -> SUCCEEDED
    * Posts to Double-Entry Ledger and updates balances.
    */
-  static executeTransaction(transactionId: string, providerRef?: string): Transaction {
+  static executeTransaction(transactionId: string, requesterUserId?: string, providerRef?: string): Transaction {
+    const financialRepository = getFinancialRepository();
+    if (financialRepository.hasTransaction(transactionId)) {
+      if (!requesterUserId) throw new Error('Authenticated transaction owner is required.');
+      if (providerRef) throw new Error('Provider references cannot settle internal wallet transfers.');
+      return financialRepository.executeInternalTransfer(transactionId, requesterUserId);
+    }
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 
@@ -287,7 +344,12 @@ export class TransactionEngine {
   /**
    * Abort transaction before execution
    */
-  static cancelTransaction(transactionId: string, reason: string): Transaction {
+  static cancelTransaction(transactionId: string, reason: string, requesterUserId?: string): Transaction {
+    const financialRepository = getFinancialRepository();
+    if (financialRepository.hasTransaction(transactionId)) {
+      if (!requesterUserId) throw new Error('Authenticated transaction owner is required.');
+      return financialRepository.cancelInternalTransaction(transactionId, requesterUserId, reason);
+    }
     const tx = db.transactions.get(transactionId);
     if (!tx) throw new Error(`Transaction '${transactionId}' not found.`);
 

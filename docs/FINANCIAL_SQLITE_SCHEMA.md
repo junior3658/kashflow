@@ -95,3 +95,15 @@ No provider settlement is enabled by this schema change. Cryptographic webhook v
 A posted organization transaction may need an accounting reversal after the initiating member's access has been revoked. Version 6 keeps new `POSTING` entries subject to current tenant authorization, but permits a `REVERSAL` entry against a wallet-linked account only when that exact account, currency, amount and opposite debit/credit direction exist in the already-posted original batch for the same transaction. The existing reversal-posting trigger still verifies the complete inverse multiset before any projection is updated.
 
 This preserves the `REFUNDED` lifecycle without reopening the revoked membership or allowing a reversal to redirect funds to a different tenant. It is an accounting correction path, not renewed user authorization.
+
+
+## Persistent internal transaction path — 27 November 2026
+
+- Authenticated internal wallet transfers now use the financial SQLite repository when both wallets are provisioned there. The legacy Maps path remains only for seeded prototype wallets that have no persistent rows.
+- Draft creation and the per-user idempotency record are inserted atomically. The request fingerprint covers owner, organization, wallet IDs, amount, currency, provider, description and canonicalized metadata.
+- PENDING transition and reservation insertion share one BEGIN IMMEDIATE transaction. SQL tenant triggers revalidate the requester and both wallet identities; the reservation trigger checks available minor units.
+- Internal settlement changes PENDING to PROCESSING, creates a two-line debit/credit batch, posts it, consumes the reservation, updates both wallet/account projections and marks SUCCEEDED in one SQLite transaction.
+- Any failure rolls back the entire settlement and leaves the transaction PENDING with its reservation intact for safe investigation/retry. It does not silently release funds or claim success.
+- Cancellation is owner-scoped and uses the SQL state transition trigger to release an active reservation.
+- Transaction reads and confirmation/cancellation routes are scoped to the authenticated creator. Provider transactions remain outside this internal path; Shwary/PayPal HTTP responses do not authorize postings.
+- The initial implementation intentionally supports zero-fee internal transfers only. Provider settlement, exchange, cross-currency postings, refunds and legacy demo-balance import remain disabled or unmigrated.

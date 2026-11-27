@@ -147,15 +147,13 @@ apiRouter.get('/wallets', (req: Request, res: Response) => {
 // 3. TRANSACTIONS
 // -------------------------------------------------------------
 apiRouter.get('/transactions', (req: Request, res: Response) => {
-  const list = Array.from(db.transactions.values()).filter((tx) => tx.userId === (req as any).userId).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  res.json({ transactions: list });
+  const userId = (req as any).userId as string;
+  res.json({ transactions: getFinancialRepository().getTransactionsByUser(userId) });
 });
 
 apiRouter.get('/transactions/:id', (req: Request, res: Response) => {
-  const tx = db.transactions.get(req.params.id);
-  if (!tx || tx.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found' });
+  const tx = getFinancialRepository().getTransactionForUser(req.params.id, (req as any).userId);
+  if (!tx) return res.status(404).json({ error: 'Transaction not found' });
   res.json({ transaction: tx });
 });
 
@@ -181,14 +179,20 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Amount must be a positive valid USD amount.' });
     }
     const currentOrgId = db.users.get(userId)?.currentOrgId;
-    const ownedWallet = Array.from(db.wallets.values()).find((wallet) =>
-      wallet.id === sourceWalletId && (wallet.ownerId === userId || (!!currentOrgId && wallet.ownerId === currentOrgId))
-    );
-    if (!ownedWallet) return res.status(403).json({ error: 'Source wallet is not available to this account.' });
+    const ownedWallet = (() => {
+      try {
+        return getFinancialRepository().getWalletForTransaction(sourceWalletId, userId, currentOrgId);
+      } catch {
+        return null;
+      }
+    })();
+    if (!ownedWallet || (ownedWallet.type !== 'PERSONAL' && ownedWallet.type !== 'BUSINESS')) {
+      return res.status(403).json({ error: 'Source wallet is not available to this account.' });
+    }
     const draft = TransactionEngine.createDraft({
       idempotencyKey: typeof idempotencyKey === 'string' ? idempotencyKey : undefined,
       userId,
-      orgId: ownedWallet.ownerId === currentOrgId ? currentOrgId : undefined,
+      orgId: ownedWallet.type === 'BUSINESS' ? currentOrgId : undefined,
       type: 'TRANSFER',
       sourceWalletId: ownedWallet.id,
       destinationWalletId: destinationWalletId.trim(),
@@ -199,8 +203,10 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
       provider: 'INTERNAL',
       description: `Transfer to ${typeof recipientName === 'string' ? recipientName.slice(0, 100) : 'Beneficiary'}`,
     });
-    if (draft.status === 'CREATED') TransactionEngine.markPending(draft.id);
-    res.status(201).json({ draft: db.transactions.get(draft.id) || draft });
+    const pendingDraft = draft.status === 'CREATED'
+      ? TransactionEngine.markPending(draft.id, userId)
+      : draft;
+    res.status(201).json({ draft: pendingDraft });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -208,9 +214,10 @@ apiRouter.post('/transfers/draft', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
   try {
-    const existing = db.transactions.get(req.params.id);
-    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
-    const tx = TransactionEngine.executeTransaction(req.params.id);
+    const userId = (req as any).userId as string;
+    const existing = getFinancialRepository().getTransactionForUser(req.params.id, userId);
+    if (!existing) return res.status(404).json({ error: 'Transaction not found.' });
+    const tx = TransactionEngine.executeTransaction(req.params.id, userId);
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -219,9 +226,11 @@ apiRouter.post('/transfers/:id/confirm', (req: Request, res: Response) => {
 
 apiRouter.post('/transfers/:id/cancel', (req: Request, res: Response) => {
   try {
-    const existing = db.transactions.get(req.params.id);
-    if (!existing || existing.userId !== (req as any).userId) return res.status(404).json({ error: 'Transaction not found.' });
-    const tx = TransactionEngine.cancelTransaction(req.params.id, req.body.reason || 'User cancelled');
+    const userId = (req as any).userId as string;
+    const existing = getFinancialRepository().getTransactionForUser(req.params.id, userId);
+    if (!existing) return res.status(404).json({ error: 'Transaction not found.' });
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'User cancelled';
+    const tx = TransactionEngine.cancelTransaction(req.params.id, reason, userId);
     res.json({ success: true, transaction: tx });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

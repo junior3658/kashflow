@@ -25,6 +25,7 @@ async function runAll() {
     await testAuthVerificationConcurrency();
     testFinancialSqliteSchema();
     testFinancialWalletProvisioning();
+    testFinancialPersistentTransactions();
     await testTransactionSafety();
     console.log('');
     await testAIAgents();
