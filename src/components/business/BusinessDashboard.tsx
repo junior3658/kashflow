@@ -91,13 +91,10 @@ export const BusinessDashboard: React.FC<BusinessDashboardProps> = ({
         </div>
       </div>
 
-      {(balanceIsSimulated || balanceProvenanceUnknown) && (
-        <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
-          {balanceIsSimulated
-            ? 'SIMULATED DEMO WORKSPACE — treasury balances, activity metrics, trends and card previews are illustrative only; no real funds or provider settlements are represented.'
-            : 'LEGACY UNVERIFIED WORKSPACE — balance provenance has not been verified; do not treat displayed amounts as confirmed funds.'}
-        </div>
-      )}
+      <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-900 dark:text-amber-200">
+        <strong>ILLUSTRATIVE BUSINESS METRICS — </strong>
+        Collections, payout totals, trend charts, reconciliation percentages, tax identifiers and card previews are static demo data, not provider balances or settlement evidence. Wallet source: {balanceIsSimulated ? 'simulated demo ledger' : balanceProvenanceUnknown ? 'legacy unverified ledger' : 'persistent internal ledger projection'}.
+      </div>
 
       {/* KPI Cards Strip (Crisp White Dominant Cards with Blue Accents) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
