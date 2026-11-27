@@ -13,6 +13,7 @@ import { testAuthOriginGuard } from './auth-origin.test';
 import { testFinancialSqliteSchema } from './financial-sqlite-schema.test';
 import { testFinancialWalletProvisioning } from './financial-wallet-provisioning.test';
 import { testFinancialPersistentTransactions } from './financial-persistent-transactions.test';
+import { testMoneyMinorUnits } from './money.test';
 
 async function runAll() {
   console.log('====================================================');
@@ -27,6 +28,7 @@ async function runAll() {
     testFinancialSqliteSchema();
     testFinancialWalletProvisioning();
     testFinancialPersistentTransactions();
+    testMoneyMinorUnits();
     await testTransactionSafety();
     console.log('');
     await testAIAgents();
