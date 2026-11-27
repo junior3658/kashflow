@@ -102,7 +102,10 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
   const user = publicUser(userId);
   if (!user) return res.status(401).json({ error: 'Authentication required.' });
   const runtimeUser = db.users.get(userId);
-  const org = runtimeUser?.currentOrgId ? db.organizations.get(runtimeUser.currentOrgId) : null;
+  const organizationId = runtimeUser?.currentOrgId;
+  const org = organizationId && getFinancialRepository().hasActiveMembership(userId, organizationId)
+    ? db.organizations.get(organizationId)
+    : null;
   res.json({ user, organization: org });
 });
 
