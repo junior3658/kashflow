@@ -6,7 +6,7 @@ The financial SQLite repository is now used for provisioned-wallet reads and for
 
 Authentication still uses a separate SQLite database. Verified users receive zero-balance personal wallets; eligible BUSINESS accounts receive a zero-balance organization wallet and OWNER membership. A revoked or unavailable business workspace is not reactivated during login and does not prevent personal authentication.
 
-This is a **partial cutover, not a production financial system**. Legacy demo wallets and some map-backed paths remain for compatibility. The persistent transfer path currently supports USD only and zero fees. Provider settlement, FX, EUR/CDF transfers, application-level persistent refunds, legacy demo-balance import and production operations remain disabled or incomplete. Shwary and PayPal cannot settle funds.
+This is a **partial cutover, not a production financial system**. Legacy demo wallets and some map-backed paths remain for compatibility. The persistent transfer path currently supports USD only and zero fees. Provider settlement, FX, EUR/CDF transfers, legacy demo-balance import and production operations remain disabled or incomplete. Owner-scoped application reversals are now available for completed zero-fee USD persistent internal transfers only. Shwary and PayPal cannot settle funds.
 
 ## Original schema foundation scope (November 2026)
 
@@ -48,7 +48,7 @@ The current db.ts seeds illustrative balances and historical transactions, inclu
 
 ## Remaining implementation steps
 
-1. Complete the application-level persistent refund/reversal operation with exact inverse entries and an atomic REFUNDED transition; keep it disabled until its tests cover authorization revocation and replay.
+1. Extend the persistent refund/reversal operation to cover authorization-revocation policies, operational audit trails and replay across process restarts; the current exact inverse implementation is restricted to zero-fee USD internal transfers.
 2. Extend persistent internal transfers beyond zero-fee USD only after currency-specific account provisioning, fee accounting and exact amount parsing are defined.
 3. Migrate remaining map-backed wallet, transaction, ledger and idempotency paths; explicitly decide how demo balances are retired or imported as simulated fixtures.
 4. Implement provider-event ingestion with official Shwary/PayPal specifications, cryptographic signature verification, immutable evidence, replay protection and independent reconciliation before any external posting.
@@ -114,7 +114,7 @@ This preserves the `REFUNDED` lifecycle without reopening the revoked membership
 - Any failure rolls back the entire settlement and leaves the transaction PENDING with its reservation intact for safe investigation/retry. It does not silently release funds or claim success.
 - Cancellation is owner-scoped and uses the SQL state transition trigger to release an active reservation.
 - Transaction reads and confirmation/cancellation routes are scoped to the authenticated creator. Provider transactions remain outside this internal path; Shwary/PayPal HTTP responses do not authorize postings.
-- The initial implementation intentionally supports zero-fee internal transfers only. Provider settlement, exchange, cross-currency postings, refunds and legacy demo-balance import remain disabled or unmigrated.
+- The initial implementation intentionally supports zero-fee internal transfers only. Provider settlement, exchange, cross-currency postings and legacy demo-balance import remain disabled or unmigrated. Exact inverse refunds are limited to zero-fee USD persistent internal transfers.
 
 
 ## Version 7 — transaction initial-state and posting-amount guards
@@ -126,7 +126,7 @@ The guards are additive and apply to newly inserted transactions and newly poste
 ## Persistent internal transfers and balance provenance — 27 November 2026
 
 - The internal transfer lifecycle is now backed by SQLite for provisioned wallets: draft creation and per-user idempotency, PENDING reservation, PROCESSING, balanced posting, wallet/account projections, reservation consumption, SUCCEEDED and cancellation share explicit SQL transactions.
-- This path is intentionally restricted to zero-fee USD wallet-to-wallet transfers. Provider settlement, refunds, FX and demo-balance imports remain disabled or unmigrated.
+- This path is intentionally restricted to zero-fee USD wallet-to-wallet transfers. Provider settlement, FX and demo-balance imports remain disabled or unmigrated. Exact inverse refunds are implemented only for zero-fee USD internal transfers in the persistent repository.
 - The legacy in-memory idempotency map is never allowed to shadow a request whose wallets are persistent. If the same user/key already exists in the legacy map, the persistent request fails closed and requires a new key; the map-backed idempotency fingerprint also includes description and metadata.
 - Seeded in-memory demo wallets are explicitly marked `isSimulated = true`. Wallet APIs identify simulated demo balances separately from estimated values based on persistent internal-ledger projections. Missing provenance is surfaced as legacy/unverified rather than silently treated as persistent.
 - The personal and business wallet interfaces display SIMULATED, PERSISTENT or UNVERIFIED provenance. A simulated business workspace labels its other illustrative dashboard metrics as demo data as well.

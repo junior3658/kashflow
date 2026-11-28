@@ -22,6 +22,7 @@ export function testFinancialPersistentTransactions() {
   try {
     addWallet('wallet-a', 'user-a', 10000);
     addWallet('wallet-b', 'user-a', 0);
+    addWallet('wallet-c', 'user-a', 0);
     addWallet('wallet-no-account', 'user-a', 0, false);
     addWallet('wallet-user-b', 'user-b', 0);
     addWallet('wallet-user-b-dest', 'user-b', 0);
@@ -79,6 +80,48 @@ export function testFinancialPersistentTransactions() {
     );
     assert.equal(repository.getTransactionForUser(draft.id, 'user-b'), null);
     assert.equal(repository.getTransactionsByUser('user-a').some((tx) => tx.id === draft.id), true);
+
+    assert.throws(
+      () => repository.refundInternalTransfer(draft.id, 'user-b', 'Unauthorized refund'),
+      /not found for authenticated user/,
+    );
+    const drainDraft = repository.createInternalTransferDraft({
+      ...input, sourceWalletId: 'wallet-b', destinationWalletId: 'wallet-c',
+      amountMinor: 1000, idempotencyKey: 'persistent-refund-drain',
+    });
+    repository.markInternalTransactionPending(drainDraft.id, 'user-a');
+    repository.executeInternalTransfer(drainDraft.id, 'user-a');
+    assert.throws(
+      () => repository.refundInternalTransfer(draft.id, 'user-a', 'Insufficient recipient balance'),
+      /Destination funds are unavailable/,
+    );
+    assert.equal(repository.getTransactionForUser(draft.id, 'user-a')?.status, 'SUCCEEDED');
+    assert.equal(
+      (sql.prepare("SELECT COUNT(*) AS count FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'REVERSAL'").get(draft.id) as {count:number}).count,
+      0,
+    );
+    repository.refundInternalTransfer(drainDraft.id, 'user-a', 'Restore wallet-b');
+    const refunded = repository.refundInternalTransfer(draft.id, 'user-a', 'Restore wallet-a');
+    assert.equal(refunded.status, 'REFUNDED');
+    const refundRetry = repository.refundInternalTransfer(draft.id, 'user-a', 'Retry');
+    assert.equal(refundRetry.status, 'REFUNDED');
+    const refundCounts = sql.prepare(
+      "SELECT COUNT(*) AS count, SUM(total_debits_minor) AS debits, SUM(total_credits_minor) AS credits FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'REVERSAL' AND posted_at IS NOT NULL"
+    ).get(draft.id) as {count:number;debits:number;credits:number};
+    assert.equal(refundCounts.count, 1);
+    assert.equal(refundCounts.debits, 1000);
+    assert.equal(refundCounts.credits, 1000);
+    assert.deepEqual(
+      sql.prepare("SELECT id, internal_balance_minor, pending_debits_minor FROM wallets WHERE id IN ('wallet-a', 'wallet-b', 'wallet-c') ORDER BY id")
+        .all() as Array<{id:string;internal_balance_minor:number;pending_debits_minor:number}>,
+      [
+        { id: 'wallet-a', internal_balance_minor: 10000, pending_debits_minor: 0 },
+        { id: 'wallet-b', internal_balance_minor: 0, pending_debits_minor: 0 },
+        { id: 'wallet-c', internal_balance_minor: 0, pending_debits_minor: 0 },
+      ],
+    );
+    console.log('✓ Persistent refunds require owner scope and unreserved recipient funds.');
+    console.log('✓ Exact inverse postings restore projections atomically; refund retries are idempotent.');
 
     const cancelDraft = repository.createInternalTransferDraft({
       ...input, amountMinor: 500, idempotencyKey: 'persistent-transfer-cancel',

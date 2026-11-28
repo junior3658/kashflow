@@ -617,6 +617,113 @@ export class FinancialRepository {
     }
   }
 
+  /**
+   * Atomically reverse a completed, zero-fee persistent internal transfer.
+   * This is an exact ledger reversal, not a discretionary wallet credit.
+   * The destination's unreserved balance must still cover the reversal debit.
+   */
+  refundInternalTransfer(transactionId: string, requesterUserId: string, reason = 'Owner requested refund'): Transaction {
+    this.sql.exec('BEGIN IMMEDIATE');
+    try {
+      const row = this.readTransactionRow(transactionId);
+      if (!row || row.user_id !== requesterUserId) {
+        throw new Error('Transaction not found for authenticated user.');
+      }
+      if (row.status === 'REFUNDED') {
+        const postedReversal = this.sql.prepare(
+          "SELECT 1 AS present FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'REVERSAL' AND posted_at IS NOT NULL"
+        ).get(transactionId);
+        if (!postedReversal) throw new Error('Refunded transaction is missing its posted reversal batch.');
+        this.sql.exec('COMMIT');
+        return this.mapTransaction(row);
+      }
+      if (row.status !== 'SUCCEEDED' || row.provider !== 'INTERNAL' ||
+          row.transaction_type !== 'TRANSFER' || !row.destination_wallet_id || row.fee_minor !== 0) {
+        throw new Error('Only completed zero-fee persistent internal transfers can be reversed.');
+      }
+
+      const original = this.sql.prepare(
+        "SELECT id, currency, total_debits_minor, total_credits_minor FROM ledger_batches WHERE transaction_id = ? AND batch_type = 'POSTING' AND posted_at IS NOT NULL"
+      ).get(transactionId) as {
+        id: string; currency: string; total_debits_minor: number; total_credits_minor: number;
+      } | undefined;
+      if (!original || original.currency !== row.currency ||
+          original.total_debits_minor !== row.amount_minor ||
+          original.total_credits_minor !== row.amount_minor) {
+        throw new Error('Original posted batch does not match the immutable transfer amount.');
+      }
+
+      const originalEntries = this.sql.prepare(
+        'SELECT account_id, currency, entry_type, amount_minor FROM ledger_entries WHERE batch_id = ? ORDER BY id'
+      ).all(original.id) as Array<{account_id: string; currency: string; entry_type: string; amount_minor: number}>;
+      if (originalEntries.length !== 2) throw new Error('Refund requires the original two-line internal transfer posting.');
+
+      const source = this.sql.prepare(
+        'SELECT a.id, a.account_type, a.balance_minor, w.internal_balance_minor, w.pending_debits_minor FROM ledger_accounts a JOIN wallets w ON w.id = a.wallet_id WHERE a.wallet_id = ? AND a.currency = ?'
+      ).get(row.source_wallet_id, row.currency) as {
+        id: string; account_type: string; balance_minor: number; internal_balance_minor: number; pending_debits_minor: number;
+      } | undefined;
+      const destination = this.sql.prepare(
+        'SELECT a.id, a.account_type, a.balance_minor, w.internal_balance_minor, w.pending_debits_minor FROM ledger_accounts a JOIN wallets w ON w.id = a.wallet_id WHERE a.wallet_id = ? AND a.currency = ?'
+      ).get(row.destination_wallet_id, row.currency) as {
+        id: string; account_type: string; balance_minor: number; internal_balance_minor: number; pending_debits_minor: number;
+      } | undefined;
+      if (!source || !destination || source.account_type !== 'LIABILITY' || destination.account_type !== 'LIABILITY' ||
+          source.balance_minor !== source.internal_balance_minor ||
+          destination.balance_minor !== destination.internal_balance_minor) {
+        throw new Error('Refund requires consistent linked LIABILITY wallet projections.');
+      }
+      const sourceEntry = originalEntries.find((entry) =>
+        entry.account_id === source.id && entry.currency === row.currency &&
+        entry.entry_type === 'DEBIT' && entry.amount_minor === row.amount_minor
+      );
+      const destinationEntry = originalEntries.find((entry) =>
+        entry.account_id === destination.id && entry.currency === row.currency &&
+        entry.entry_type === 'CREDIT' && entry.amount_minor === row.amount_minor
+      );
+      if (!sourceEntry || !destinationEntry) {
+        throw new Error('Original posting does not match the source and destination wallets.');
+      }
+      if (source.internal_balance_minor > 9007199254740991 - row.amount_minor ||
+          destination.pending_debits_minor > destination.internal_balance_minor ||
+          destination.internal_balance_minor - destination.pending_debits_minor < row.amount_minor) {
+        throw new Error('Destination funds are unavailable or refund projections would exceed safe limits.');
+      }
+
+      const reversalId = 'lb_' + randomUUID();
+      const now = new Date().toISOString();
+      this.sql.prepare(
+        "INSERT INTO ledger_batches (id, transaction_id, batch_type, currency, total_debits_minor, total_credits_minor, reversal_of_batch_id, created_at) VALUES (?, ?, 'REVERSAL', ?, ?, ?, ?, ?)"
+      ).run(reversalId, transactionId, row.currency, row.amount_minor, row.amount_minor, original.id, now);
+      const safeReason = typeof reason === 'string' && reason.trim()
+        ? reason.trim().slice(0, 250)
+        : 'Owner requested refund';
+      for (const entry of originalEntries) {
+        this.sql.prepare(
+          'INSERT INTO ledger_entries (id, batch_id, account_id, currency, entry_type, amount_minor, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(
+          'le_' + randomUUID(), reversalId, entry.account_id, entry.currency,
+          entry.entry_type === 'DEBIT' ? 'CREDIT' : 'DEBIT', entry.amount_minor,
+          `Exact reversal of ${transactionId}: ${safeReason}`.slice(0, 500), now,
+        );
+      }
+      this.sql.prepare('UPDATE ledger_batches SET posted_at = ? WHERE id = ? AND posted_at IS NULL')
+        .run(now, reversalId);
+      const changed = this.sql.prepare(
+        "UPDATE transactions SET status = 'REFUNDED', updated_at = ? WHERE id = ? AND user_id = ? AND status = 'SUCCEEDED'"
+      ).run(now, transactionId, requesterUserId);
+      if (changed.changes !== 1) throw new Error('Transaction could not enter REFUNDED after reversal posting.');
+
+      this.sql.exec('COMMIT');
+      const refunded = this.readTransactionRow(transactionId);
+      if (!refunded) throw new Error('Refunded transaction could not be reloaded.');
+      return this.mapTransaction(refunded);
+    } catch (error) {
+      try { this.sql.exec('ROLLBACK'); } catch { /* transaction may already have ended */ }
+      throw error;
+    }
+  }
+
   /** Cancellation is owner-scoped; the SQL trigger releases any active reservation. */
   cancelInternalTransaction(transactionId: string, requesterUserId: string, reason: string): Transaction {
     this.sql.exec('BEGIN IMMEDIATE');
